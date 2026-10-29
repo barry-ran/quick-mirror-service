@@ -28,6 +28,11 @@ type Request struct {
 	IdempotencyKey string
 }
 
+func (r Request) Validate() error {
+	_, _, err := r.fingerprints()
+	return err
+}
+
 type GrantIssuer interface {
 	Issue(context.Context, identity.Role, string, int) (peerloom.RegistrationGrant, error)
 	ReplayDomain() string

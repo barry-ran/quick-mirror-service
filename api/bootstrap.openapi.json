@@ -1,0 +1,191 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "QuickMirror 安装注册接口",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/qm/v1/bootstrap/pc": {
+      "post": {
+        "operationId": "bootstrapPc",
+        "security": [],
+        "description": "角色由路径和服务端固定 application 映射决定；不接收原产品账号token。HTTP运行时必须使用TLS；响应禁止缓存。结果未知不可换key自动重试。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BootstrapRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "注册grant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BootstrapResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400/409/413/415/429/503；错误code稳定，message支持中英文",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/qm/v1/bootstrap/mobile": {
+      "post": {
+        "operationId": "bootstrapMobile",
+        "security": [],
+        "description": "角色由路径和服务端固定 application 映射决定；不接收原产品账号token。HTTP运行时必须使用TLS；响应禁止缓存。结果未知不可换key自动重试。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BootstrapRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "注册grant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BootstrapResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400/409/413/415/429/503；错误code稳定，message支持中英文",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "BootstrapRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "idempotency_key"
+        ],
+        "properties": {
+          "install_public_label": {
+            "type": "string",
+            "description": "可选安装标签；UTF-8 最多256字节，无控制字符；不作为身份或文件路径"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "format": "uuid",
+            "description": "随机安装尝试UUID；同次尝试保持不变，非身份凭证"
+          }
+        }
+      },
+      "BootstrapResponse": {
+        "type": "object",
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "registration_grant",
+              "expires_at",
+              "application_id",
+              "peerloom_origin",
+              "service_scope"
+            ],
+            "properties": {
+              "registration_grant": {
+                "type": "string",
+                "writeOnly": false,
+                "description": "一次性敏感凭证，禁止记录"
+              },
+              "expires_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "application_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "peerloom_origin": {
+                "type": "string",
+                "format": "uri"
+              },
+              "service_scope": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "request_id",
+          "error"
+        ],
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "retryable"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "retryable": {
+                "type": "boolean"
+              },
+              "retry_after_ms": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
