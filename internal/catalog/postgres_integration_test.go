@@ -190,3 +190,60 @@ func TestPostgresBatchBeyond500(t *testing.T) {
 		t.Fatal("total device truncation", count)
 	}
 }
+
+func TestPostgresEnsureRegistrationPreservesStatus(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	principal := mobile(testDevice)
+	if err := s.EnsureRegistration(ctx, pc()); !errors.Is(err, identity.ErrForbidden) {
+		t.Fatal("PC created mobile record", err)
+	}
+	if err := s.EnsureRegistration(ctx, principal); err != nil {
+		t.Fatal(err)
+	}
+	initial, err := s.ResolveBatch(ctx, pc(), []string{testDevice})
+	if err != nil || !initial[0].Found || initial[0].Device.AppVersion != "" {
+		t.Fatal("new identity missing", err)
+	}
+	status := Status{BootID: "55555555-5555-4555-8555-555555555555", Sequence: 7, AppVersion: "1.2.3", Permissions: Permissions{Projection: true}, Capabilities: map[string]Capability{"capture": {Supported: true, Available: true}}}
+	if err := s.UpdateStatus(ctx, principal, status); err != nil {
+		t.Fatal(err)
+	}
+	var before string
+	if err := s.pool.QueryRow(ctx, `SELECT row_to_json(d)::text FROM qm_device_catalog d WHERE service_scope=$1 AND device_uuid=$2`, testScope, testDevice).Scan(&before); err != nil {
+		t.Fatal(err)
+	}
+	var wg sync.WaitGroup
+	errs := make(chan error, 32)
+	for i := 0; i < 32; i++ {
+		wg.Add(1)
+		go func() { defer wg.Done(); errs <- s.EnsureRegistration(ctx, principal) }()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	var after string
+	if err := s.pool.QueryRow(ctx, `SELECT row_to_json(d)::text FROM qm_device_catalog d WHERE service_scope=$1 AND device_uuid=$2`, testScope, testDevice).Scan(&after); err != nil {
+		t.Fatal(err)
+	}
+	if before != after {
+		t.Fatal("identity re-exchange changed existing device snapshot")
+	}
+	other := principal
+	other.ApplicationID = "66666666-6666-4666-8666-666666666666"
+	if err := s.EnsureRegistration(ctx, other); !errors.Is(err, identity.ErrForbidden) {
+		t.Fatal("application takeover accepted", err)
+	}
+	other = principal
+	other.TenantID = "77777777-7777-4777-8777-777777777777"
+	if err := s.EnsureRegistration(ctx, other); !errors.Is(err, identity.ErrForbidden) {
+		t.Fatal("foreign tenant accepted", err)
+	}
+	if err := s.UpdateStatus(ctx, principal, status); !errors.Is(err, ErrStaleStatus) {
+		t.Fatal("re-exchange reset sequence", err)
+	}
+}

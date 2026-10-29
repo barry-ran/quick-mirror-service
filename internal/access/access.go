@@ -1,4 +1,4 @@
-// Package access 定义待接线的业务令牌边界：必须有可信凭证期限，且每请求重验来源身份。
+// Package access 定义业务令牌边界：必须有可信凭证期限，且每请求重验来源身份。
 // 不提供缺少上游能力时的允许分支，也不接入原产品账号 token。
 package access
 
@@ -27,7 +27,7 @@ var migration string
 var ErrInvalidConfig = errors.New("INVALID_AUTH_CONFIGURATION")
 
 // VerifiedCredential 的期限必须来自同次权威认证结果，不接受客户端自报值。
-// 上游公开 credential_expires_at 扩展尚未发布，因此草案 adapter 尚未完成真实联调，不能接线生产。
+// 上游公开 credential_expires_at 来自同次身份认证，正式v0.1.3已通过实际联调。
 type VerifiedCredential struct {
 	Principal identity.Principal
 	ExpiresAt time.Time
@@ -102,27 +102,33 @@ func validCredential(credential string) bool {
 }
 
 func (s *Store) Exchange(ctx context.Context, role identity.Role, credential string) (Token, error) {
+	token, _, err := s.ExchangeVerified(ctx, role, credential)
+	return token, err
+}
+
+// ExchangeVerified 返回同次认证的主体，供业务接线幂等建档；不重复猜测或解码凭证。
+func (s *Store) ExchangeVerified(ctx context.Context, role identity.Role, credential string) (Token, identity.Principal, error) {
 	var empty Token
 	if !validCredential(credential) {
-		return empty, identity.ErrInvalidCredential
+		return empty, identity.Principal{}, identity.ErrInvalidCredential
 	}
 	if role != identity.PC && role != identity.Mobile {
-		return empty, identity.ErrForbidden
+		return empty, identity.Principal{}, identity.ErrForbidden
 	}
 	verified, err := s.verifier.VerifyCredential(ctx, credential)
 	if err != nil {
-		return empty, verificationError(err)
+		return empty, identity.Principal{}, verificationError(err)
 	}
 	p, valid := canonicalPrincipal(verified.Principal)
 	if !valid || p.TenantID != s.tenant || p.Role != role {
-		return empty, identity.ErrForbidden
+		return empty, identity.Principal{}, identity.ErrForbidden
 	}
 	if verified.ExpiresAt.IsZero() {
-		return empty, identity.ErrUnavailable
+		return empty, identity.Principal{}, identity.ErrUnavailable
 	}
 	var now time.Time
 	if err := s.pool.QueryRow(ctx, `SELECT clock_timestamp()`).Scan(&now); err != nil {
-		return empty, identity.ErrUnavailable
+		return empty, identity.Principal{}, identity.ErrUnavailable
 	}
 	expiry := now.Add(15 * time.Minute)
 	if verified.ExpiresAt.Before(expiry) {
@@ -130,32 +136,32 @@ func (s *Store) Exchange(ctx context.Context, role identity.Role, credential str
 	}
 	expiry = expiry.UTC().Truncate(time.Microsecond)
 	if !expiry.After(now) {
-		return empty, identity.ErrInvalidCredential
+		return empty, identity.Principal{}, identity.ErrInvalidCredential
 	}
 	var random [32]byte
 	if _, err := rand.Read(random[:]); err != nil {
-		return empty, identity.ErrUnavailable
+		return empty, identity.Principal{}, identity.ErrUnavailable
 	}
 	token := "qma_" + base64.RawURLEncoding.EncodeToString(random[:])
 	hash, _ := tokenHash(token)
 	// 随机96-bit nonce 的每key加密预算跨实例持久累计；失败/不确定的尝试不退款。
 	if err := s.reserveEncryption(ctx); err != nil {
-		return empty, identity.ErrUnavailable
+		return empty, identity.Principal{}, identity.ErrUnavailable
 	}
 	nonce := make([]byte, s.aead.NonceSize())
 	if _, err := rand.Read(nonce); err != nil {
-		return empty, identity.ErrUnavailable
+		return empty, identity.Principal{}, identity.ErrUnavailable
 	}
 	sealed := s.aead.Seal(nil, nonce, []byte(credential), aad(s.scope, hash, p, expiry))
 	result, err := s.pool.Exec(ctx, `INSERT INTO qm_access_tokens(service_scope,token_hash,device_uuid,tenant_uuid,application_uuid,role,expires_at,credential_nonce,credential_ciphertext)
 SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9 WHERE $7::timestamptz>clock_timestamp()`, s.scope, hash[:], p.DeviceID, p.TenantID, p.ApplicationID, p.Role, expiry, nonce, sealed)
 	if err != nil {
-		return empty, identity.ErrUnavailable
+		return empty, identity.Principal{}, identity.ErrUnavailable
 	}
 	if result.RowsAffected() != 1 {
-		return empty, identity.ErrInvalidCredential
+		return empty, identity.Principal{}, identity.ErrInvalidCredential
 	}
-	return Token{AccessToken: token, ExpiresAt: expiry, Scope: s.scope}, nil
+	return Token{AccessToken: token, ExpiresAt: expiry, Scope: s.scope}, p, nil
 }
 
 func (s *Store) reserveEncryption(ctx context.Context) error {

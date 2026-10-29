@@ -20,7 +20,7 @@ import (
 	"testing"
 )
 
-func testHTTPDirectory(t *testing.T) *catalog.Store {
+func testHTTPPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	dsn := os.Getenv("QM_TEST_DATABASE_URL")
 	if dsn == "" {
@@ -60,6 +60,13 @@ func testHTTPDirectory(t *testing.T) *catalog.Store {
 		}
 		admin.Close()
 	})
+	return pool
+}
+
+func testHTTPDirectory(t *testing.T) *catalog.Store {
+	t.Helper()
+	ctx := context.Background()
+	pool := testHTTPPool(t)
 	store, err := catalog.NewStore(pool, scope, scope)
 	if err != nil {
 		t.Fatal(err)
