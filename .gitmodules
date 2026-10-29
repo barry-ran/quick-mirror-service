@@ -1,0 +1,12 @@
+[submodule "AutoX"]
+	path = AutoX
+	url = git@github.com:barry-ran/AutoX.git
+	branch = qm
+[submodule "peerloom"]
+	path = peerloom
+	url = git@github.com:barry-ran/peerloom.git
+	branch = master
+[submodule "quick-desktop"]
+	path = quick-desktop
+	url = git@github.com:barry-ran/quick-desktop.git
+	branch = qm-safe
