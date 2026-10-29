@@ -151,3 +151,17 @@ func TestRegistrationRejectInputAndRedirect(t *testing.T) {
 		t.Fatal("cancellation not preserved as uncertain")
 	}
 }
+
+func TestRegistrationReplayDomain(t *testing.T) {
+	c1, err := NewRegistrationClient(config("https://example.test"), "svc_one", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c2, err := NewRegistrationClient(config("https://example.test"), "svc_two", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c1.ReplayDomain()) != 64 || c1.ReplayDomain() == c2.ReplayDomain() || strings.Contains(c1.ReplayDomain(), "svc_one") {
+		t.Fatal("rotation domain not isolated")
+	}
+}
