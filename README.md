@@ -8,6 +8,7 @@
 - Peerloom `GET /v1/device-self` HTTP 适配器：HTTPS、超时、禁止重定向、响应体上限、服务域租户校验、可信 application 到 PC/手机角色映射。
 - 原产品账号 token 不参与上述校验；平台和 metadata 不作为角色证据。
 - PostgreSQL 设备目录：安装注册、权限能力快照、boot/seq并发一致性、按服务域分批查询。
+- 安装注册 HTTP Handler 与 OpenAPI：严格 JSON、角色绑定、资源预算和稳定错误语义；尚无公开部署。
 - 公开 registration-grants 适配器与 bootstrap 幂等意图存储：并发/重启复用原尝试，冲突、过期、凭证轮换时明确拒绝，不存管理密钥或 grant 明文。
 
 目前是经过测试的服务基础模块，不是可部署的完整业务服务器。目录外部接口与状态推送、业务 token 交换、会话编排、自定义 TURN 和完整联调尚未交付；没有以 mock 启动生产服务的路径。开发范围与验收门禁见 [文档入口](docs/README.md)。
