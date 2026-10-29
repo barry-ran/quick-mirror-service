@@ -36,7 +36,7 @@ type IdentityClient struct {
 // 允许注入具有私有 CA 信任的 Transport，不支持跳过 TLS 的生产开关。
 func NewIdentityClient(config IdentityConfig, client *http.Client) (*IdentityClient, error) {
 	origin, err := url.Parse(config.Origin)
-	if err != nil || origin.Scheme != "https" || origin.Host == "" || origin.User != nil || origin.RawQuery != "" || origin.Fragment != "" || (origin.Path != "" && origin.Path != "/") {
+	if err != nil || origin.Scheme != "https" || origin.Host == "" || origin.User != nil || origin.RawQuery != "" || origin.ForceQuery || origin.Fragment != "" || (origin.Path != "" && origin.Path != "/") {
 		return nil, errors.New("Peerloom origin must be an HTTPS origin")
 	}
 	tenant, validTenant := identity.NormalizeUUID(config.TenantID)

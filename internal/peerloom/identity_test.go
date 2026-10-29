@@ -107,7 +107,7 @@ func TestRejectRedirectAndInvalidCredential(t *testing.T) {
 }
 
 func TestConfigurationAndCancellation(t *testing.T) {
-	for _, origin := range []string{"http://example.com", "https://user:pass@example.com", "https://example.com/path", "https://example.com?x=y", "https://example.com#x", "https://"} {
+	for _, origin := range []string{"http://example.com", "https://user:pass@example.com", "https://example.com/path", "https://example.com?x=y", "https://example.com?", "https://example.com#x", "https://"} {
 		if _, err := NewIdentityClient(config(origin), nil); err == nil {
 			t.Fatalf("accepted %q", origin)
 		}

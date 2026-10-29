@@ -145,7 +145,7 @@ func (h *BootstrapHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(415, "INVALID_CONTENT_TYPE", false)
 		return
 	}
-	if r.URL.RawQuery != "" {
+	if r.URL.RawQuery != "" || r.URL.ForceQuery {
 		fail(400, "INVALID_INPUT", false)
 		return
 	}
