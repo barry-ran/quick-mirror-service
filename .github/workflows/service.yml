@@ -29,6 +29,21 @@ jobs:
       - run: go test -race ./...
       - run: go vet ./...
       - run: go build ./...
+      - run: go test -run '^$' -tags runtimeintegration ./cmd/quick-mirror-service
+      - name: 构建服务验证产物
+        shell: bash
+        run: |
+          suffix=""
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            suffix=".exe"
+          fi
+          mkdir -p dist
+          go build -trimpath -o "dist/quick-mirror-service${suffix}" ./cmd/quick-mirror-service
+      - uses: actions/upload-artifact@v4
+        with:
+          name: quick-mirror-service-${{ matrix.os }}
+          path: dist/*
+          retention-days: 7
 
   postgres-integration:
     runs-on: ubuntu-latest

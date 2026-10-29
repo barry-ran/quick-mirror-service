@@ -44,18 +44,29 @@ type BootstrapHandler struct {
 	last   time.Time
 }
 
-func NewBootstrapHandler(config BootstrapConfig, issuer BootstrapIssuer) (*BootstrapHandler, error) {
+func ValidateBootstrapConfig(config BootstrapConfig) (BootstrapConfig, error) {
 	scope, valid := identity.NormalizeUUID(config.ServiceScope)
-	if !valid || issuer == nil || config.MaxConcurrent < 1 || config.MaxConcurrent > 4096 || config.Burst < 1 || config.Burst > 100000 || math.IsNaN(config.RequestsPerSecond) || math.IsInf(config.RequestsPerSecond, 0) || config.RequestsPerSecond <= 0 || config.RequestsPerSecond > 100000 {
-		return nil, bootstrap.ErrInvalidInput
+	if !valid || config.MaxConcurrent < 1 || config.MaxConcurrent > 4096 || config.Burst < 1 || config.Burst > 100000 || math.IsNaN(config.RequestsPerSecond) || math.IsInf(config.RequestsPerSecond, 0) || config.RequestsPerSecond <= 0 || config.RequestsPerSecond > 100000 {
+		return config, bootstrap.ErrInvalidInput
 	}
 	if _, err := peerloom.NewIdentityClient(config.Identity, nil); err != nil {
-		return nil, err
+		return config, err
 	}
 	config.ServiceScope = scope
 	config.Identity.PCApplicationID, _ = identity.NormalizeUUID(config.Identity.PCApplicationID)
 	config.Identity.MobileApplicationID, _ = identity.NormalizeUUID(config.Identity.MobileApplicationID)
 	config.Identity.Origin = strings.TrimSuffix(config.Identity.Origin, "/")
+	return config, nil
+}
+
+func NewBootstrapHandler(config BootstrapConfig, issuer BootstrapIssuer) (*BootstrapHandler, error) {
+	if issuer == nil {
+		return nil, bootstrap.ErrInvalidInput
+	}
+	config, err := ValidateBootstrapConfig(config)
+	if err != nil {
+		return nil, err
+	}
 	return &BootstrapHandler{issuer: issuer, config: config, active: make(chan struct{}, config.MaxConcurrent), tokens: float64(config.Burst), last: time.Now()}, nil
 }
 
