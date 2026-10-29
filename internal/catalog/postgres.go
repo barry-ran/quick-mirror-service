@@ -45,6 +45,26 @@ func (s *Store) mobile(principal identity.Principal) (string, string, error) {
 	return id, application, nil
 }
 
+// EnsureRegistration 用于身份交换后的幂等建档；重交换不能清空已有版本、boot或权限快照。
+// 它只接受可信手机主体，不从请求正文获取 device/application UUID。
+func (s *Store) EnsureRegistration(ctx context.Context, principal identity.Principal) error {
+	id, application, err := s.mobile(principal)
+	if err != nil {
+		return err
+	}
+	result, err := s.pool.Exec(ctx, `INSERT INTO qm_device_catalog(service_scope,device_uuid,application_id,app_version)
+VALUES($1,$2,$3,'') ON CONFLICT(service_scope,device_uuid) DO UPDATE
+SET application_id=qm_device_catalog.application_id
+WHERE qm_device_catalog.application_id=EXCLUDED.application_id`, s.scope, id, application)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
+		return identity.ErrForbidden
+	}
+	return nil
+}
+
 // Register 仅接受已验证的手机主体；没有录屏权限也允许注册目录。
 func (s *Store) Register(ctx context.Context, principal identity.Principal, version string) error {
 	id, application, err := s.mobile(principal)

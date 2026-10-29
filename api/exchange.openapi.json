@@ -1,0 +1,186 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "QuickMirror 安装身份交换",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/qm/v1/auth/pc/exchange": {
+      "post": {
+        "summary": "PC安装身份交换",
+        "description": "运行时HTTP接口，依赖正式Peerloom v0.1.3可信credential expiry。Authorization只接受安装凭证，不验证或转发原产品账号token。正文允许缺省或空对象，禁止客户端主体/期限。",
+        "security": [
+          {
+            "InstallationCredential": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "no-store；同次可信认证签发，手机目录确保存在后才返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "request_id",
+                    "data"
+                  ],
+                  "properties": {
+                    "request_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Token"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "稳定错误信封；不包含凭证、上游或数据库内部错误"
+          },
+          "401": {
+            "description": "稳定错误信封；不包含凭证、上游或数据库内部错误"
+          },
+          "403": {
+            "description": "稳定错误信封；不包含凭证、上游或数据库内部错误"
+          },
+          "405": {
+            "description": "稳定错误信封；不包含凭证、上游或数据库内部错误"
+          },
+          "413": {
+            "description": "稳定错误信封；不包含凭证、上游或数据库内部错误"
+          },
+          "415": {
+            "description": "稳定错误信封；不包含凭证、上游或数据库内部错误"
+          },
+          "429": {
+            "description": "稳定错误信封；不包含凭证、上游或数据库内部错误"
+          },
+          "503": {
+            "description": "稳定错误信封；不包含凭证、上游或数据库内部错误"
+          }
+        }
+      }
+    },
+    "/qm/v1/auth/device/exchange": {
+      "post": {
+        "summary": "手机安装身份交换并幂等确保目录记录",
+        "description": "运行时HTTP接口，依赖正式Peerloom v0.1.3可信credential expiry。Authorization只接受安装凭证，不验证或转发原产品账号token。正文允许缺省或空对象，禁止客户端主体/期限。",
+        "security": [
+          {
+            "InstallationCredential": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "no-store；同次可信认证签发，手机目录确保存在后才返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "request_id",
+                    "data"
+                  ],
+                  "properties": {
+                    "request_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Token"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "稳定错误信封；不包含凭证、上游或数据库内部错误"
+          },
+          "401": {
+            "description": "稳定错误信封；不包含凭证、上游或数据库内部错误"
+          },
+          "403": {
+            "description": "稳定错误信封；不包含凭证、上游或数据库内部错误"
+          },
+          "405": {
+            "description": "稳定错误信封；不包含凭证、上游或数据库内部错误"
+          },
+          "413": {
+            "description": "稳定错误信封；不包含凭证、上游或数据库内部错误"
+          },
+          "415": {
+            "description": "稳定错误信封；不包含凭证、上游或数据库内部错误"
+          },
+          "429": {
+            "description": "稳定错误信封；不包含凭证、上游或数据库内部错误"
+          },
+          "503": {
+            "description": "稳定错误信封；不包含凭证、上游或数据库内部错误"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "InstallationCredential": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Peerloom安装credential，由固定上游重新验证；不是业务access_token或原产品账号token"
+      }
+    },
+    "schemas": {
+      "Token": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "access_token",
+          "expires_at",
+          "scope"
+        ],
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "opaque业务token，不可离线解码"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "不超过数据库当前时间15分钟及同次可信来源凭证期限"
+          },
+          "scope": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      }
+    }
+  }
+}

@@ -28,7 +28,7 @@ type DeviceCatalog interface {
 	UpdateStatus(context.Context, identity.Principal, catalog.Status) error
 }
 
-// CatalogHandler 尚未挂到运行时，须先有真实 exchange/可信期限 adapter。
+// CatalogHandler 通过业务令牌及来源凭证逐请求重验访问目录。
 type CatalogHandler struct {
 	access    AccessVerifier
 	directory DeviceCatalog

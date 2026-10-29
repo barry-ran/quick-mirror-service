@@ -53,7 +53,7 @@
 
 依赖 T01–T04。新增 PeerloomClient、DeviceSessionManager、LocalStreamBridge 和 Server APK transport 分支。替换设备发现来源，保持原列表更新信号；serial 映射 UUID。
 
-验收：无 adb.exe 存在时仍可运行核心功能；APK模式启动没有push/forward/reverse；video/control接入口角色固定、token隔离；网络分片和高延迟下握手成功，不依赖70ms；旧 media_generation 不进入新解码器；切画质仍使用原控制字段。连接与投屏分离，主动断开不抢回。
+验收：无 adb.exe 存在时仍可运行核心功能；APK模式启动没有push/forward/reverse；video/control接入口角色固定、token隔离；网络分片和高延迟下握手成功，不依赖70ms；旧 media_generation 不进入新解码器；切画质仍使用原控制字段。连接与投屏分离，主动断开不抢回。 每次 connectDevice/disconnect 按调用恰好一次通知成功或失败；覆盖忙碌/重复请求、取消、超时、连接中断开、远端断线、同步回调析构和迟到旧代次回调。检查逐调用关联与有限期限完成，不只统计总次数；不得以静默忽略请求规避通知。
 
 ### T06 单 JS 下发和执行
 

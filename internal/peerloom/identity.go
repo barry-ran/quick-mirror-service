@@ -68,8 +68,8 @@ func (c *IdentityClient) Verify(ctx context.Context, credential string) (identit
 	return result.Principal, err
 }
 
-// VerifyCredential 适配待发布的公开期限字段；缺字段时失败关闭，不猜测客户端期限。
-// 当前仅有契约夹具验证，未挂载生产 exchange，须等待上游发布及真实联调。
+// VerifyCredential 适配公开可信期限字段；缺字段时失败关闭，不猜测客户端期限。
+// 已通过正式v0.1.3公开接口实际联调；缺少可信字段仍失败关闭。
 func (c *IdentityClient) VerifyCredential(ctx context.Context, credential string) (access.VerifiedCredential, error) {
 	var empty access.VerifiedCredential
 	result, err := c.fetchIdentity(ctx, credential)

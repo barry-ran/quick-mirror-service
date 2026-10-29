@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "QuickMirror 设备目录HTTP边界（未挂载）",
+    "title": "QuickMirror 设备目录HTTP边界",
     "version": "1.0.0"
   },
   "security": [
@@ -159,7 +159,7 @@
   "paths": {
     "/qm/v1/devices/resolve": {
       "post": {
-        "description": "仅PC。当前阶段仅返回存在性，不输出旧权限作为在线证据；快照revision/status/events尚未实现。 当前Handler未挂运行时，必须完成真实exchange与可信期限adapter后才能开放。",
+        "description": "仅PC。当前阶段仅返回存在性，不输出旧权限作为在线证据；快照revision/status/events尚未实现。 运行时通过业务token逐请求重验来源身份。",
         "requestBody": {
           "required": true,
           "content": {
@@ -220,7 +220,7 @@
     },
     "/qm/v1/device-self/status": {
       "put": {
-        "description": "仅手机本人；身份来自业务token。PUT完整替换快照，未给权限默认false。不是在线心跳/会话续租。未注册目录404，旧seq/退役boot409。 当前Handler未挂运行时，必须完成真实exchange与可信期限adapter后才能开放。",
+        "description": "仅手机本人；身份来自业务token。PUT完整替换快照，未给权限默认false。不是在线心跳/会话续租。未注册目录404，旧seq/退役boot409。 运行时通过业务token逐请求重验来源身份。",
         "requestBody": {
           "required": true,
           "content": {
