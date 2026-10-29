@@ -27,7 +27,7 @@ var migration string
 var ErrInvalidConfig = errors.New("INVALID_AUTH_CONFIGURATION")
 
 // VerifiedCredential 的期限必须来自同次权威认证结果，不接受客户端自报值。
-// 上游公开 credential_expires_at 扩展尚未发布，因此当前没有生产 adapter。
+// 上游公开 credential_expires_at 扩展尚未发布，因此草案 adapter 尚未完成真实联调，不能接线生产。
 type VerifiedCredential struct {
 	Principal identity.Principal
 	ExpiresAt time.Time
