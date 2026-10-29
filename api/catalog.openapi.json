@@ -1,0 +1,280 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "QuickMirror 设备目录HTTP边界（未挂载）",
+    "version": "1.0.0"
+  },
+  "security": [
+    {
+      "AccessToken": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "AccessToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "opaque"
+      }
+    },
+    "schemas": {
+      "ResolveRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "uuids"
+        ],
+        "properties": {
+          "uuids": {
+            "type": "array",
+            "maxItems": 200,
+            "items": {
+              "type": "string"
+            },
+            "description": "单请求最多200，客户端继续分批；不是设备总数限制。非法UUID逐项返回错误。"
+          }
+        }
+      },
+      "Resolution": {
+        "type": "object",
+        "required": [
+          "uuid",
+          "found"
+        ],
+        "properties": {
+          "uuid": {
+            "type": "string"
+          },
+          "found": {
+            "type": "boolean"
+          },
+          "error_code": {
+            "type": "string"
+          }
+        }
+      },
+      "Capability": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "supported": {
+            "type": "boolean",
+            "default": false
+          },
+          "available": {
+            "type": "boolean",
+            "default": false
+          },
+          "reason": {
+            "type": "string",
+            "description": "最多256 UTF-8字节；available=true要求supported=true"
+          }
+        }
+      },
+      "Status": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "boot_id",
+          "seq"
+        ],
+        "properties": {
+          "boot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "seq": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "app_version": {
+            "type": "string",
+            "description": "最多128 UTF-8字节"
+          },
+          "permissions": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "projection": {
+                "type": "boolean",
+                "default": false
+              },
+              "accessibility": {
+                "type": "boolean",
+                "default": false
+              },
+              "ime": {
+                "type": "boolean",
+                "default": false
+              }
+            }
+          },
+          "capabilities": {
+            "type": "object",
+            "maxProperties": 64,
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Capability"
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "request_id",
+          "error"
+        ],
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "retryable"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "retryable": {
+                "type": "boolean"
+              },
+              "retry_after_ms": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/qm/v1/devices/resolve": {
+      "post": {
+        "description": "仅PC。当前阶段仅返回存在性，不输出旧权限作为在线证据；快照revision/status/events尚未实现。 当前Handler未挂运行时，必须完成真实exchange与可信期限adapter后才能开放。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "request_id",
+                    "data"
+                  ],
+                  "properties": {
+                    "request_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "items"
+                      ],
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Resolution"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400/401/403/404/409/413/415/429/503；所有层级拒绝重复键，正文最大1MiB，JSON深度32且值/键预算4096。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/qm/v1/device-self/status": {
+      "put": {
+        "description": "仅手机本人；身份来自业务token。PUT完整替换快照，未给权限默认false。不是在线心跳/会话续租。未注册目录404，旧seq/退役boot409。 当前Handler未挂运行时，必须完成真实exchange与可信期限adapter后才能开放。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Status"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "request_id",
+                    "data"
+                  ],
+                  "properties": {
+                    "request_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "accepted"
+                      ],
+                      "properties": {
+                        "accepted": {
+                          "const": true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "400/401/403/404/409/413/415/429/503；所有层级拒绝重复键，正文最大1MiB，JSON深度32且值/键预算4096。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
