@@ -3,6 +3,8 @@ package peerloom
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -34,6 +36,14 @@ type RegistrationClient struct {
 	pc         string
 	mobile     string
 	client     *http.Client
+}
+
+// ReplayDomain 是部署/凭证/app 映射的不可逆标识，不是认证凭证。
+// Peerloom 将幂等域绑定到管理凭证；轮换后旧尝试必须拒绝重发，而不能新签一个 grant。
+func (c *RegistrationClient) ReplayDomain() string {
+	value, _ := json.Marshal([]string{c.endpoint, c.credential, c.pc, c.mobile})
+	digest := sha256.Sum256(value)
+	return hex.EncodeToString(digest[:])
 }
 
 func NewRegistrationClient(config IdentityConfig, serviceCredential string, client *http.Client) (*RegistrationClient, error) {

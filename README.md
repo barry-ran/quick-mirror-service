@@ -8,6 +8,7 @@
 - Peerloom `GET /v1/device-self` HTTP 适配器：HTTPS、超时、禁止重定向、响应体上限、服务域租户校验、可信 application 到 PC/手机角色映射。
 - 原产品账号 token 不参与上述校验；平台和 metadata 不作为角色证据。
 - PostgreSQL 设备目录：安装注册、权限能力快照、boot/seq并发一致性、按服务域分批查询。
+- 公开 registration-grants 适配器与 bootstrap 幂等意图存储：并发/重启复用原尝试，冲突、过期、凭证轮换时明确拒绝，不存管理密钥或 grant 明文。
 
 目前是经过测试的服务基础模块，不是可部署的完整业务服务器。目录外部接口与状态推送、业务 token 交换、会话编排、自定义 TURN 和完整联调尚未交付；没有以 mock 启动生产服务的路径。开发范围与验收门禁见 [文档入口](docs/README.md)。
 
@@ -25,4 +26,4 @@ go build ./...
 
 ## 仓库布局
 
-`internal/identity` 定义服务内部身份边界，`internal/peerloom` 实现公开 HTTP 适配，`internal/catalog` 管理独立业务目录，`docs` 保存产品、架构和模块说明。根目录三个子模块仅为开发源码定位；最终联调验收后按用户要求移除这些链接，不删除远端仓库。
+`internal/identity` 定义服务内部身份边界，`internal/peerloom` 实现公开 HTTP 适配，`internal/catalog` 管理独立业务目录，`internal/bootstrap` 保存注册尝试收据，`docs` 保存产品、架构和模块说明。根目录三个子模块仅为开发源码定位；最终联调验收后按用户要求移除这些链接，不删除远端仓库。
