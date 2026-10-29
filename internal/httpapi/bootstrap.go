@@ -183,7 +183,7 @@ func (h *BootstrapHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	json.NewEncoder(w).Encode(map[string]any{"request_id": requestID, "data": map[string]any{"registration_grant": grant.Grant, "expires_at": grant.ExpiresAt, "application_id": application, "peerloom_origin": h.config.Identity.Origin, "service_scope": h.config.ServiceScope}})
+	json.NewEncoder(w).Encode(map[string]any{"request_id": requestID, "data": map[string]any{"registration_grant": grant.Grant, "expires_at": grant.ExpiresAt.UTC(), "application_id": application, "peerloom_origin": h.config.Identity.Origin, "service_scope": h.config.ServiceScope}})
 }
 
 // 显式拒绝重复键和无效 UTF-8，不能让 JSON 解码的替换字符改变请求语义。

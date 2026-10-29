@@ -136,6 +136,7 @@ func (c *RegistrationClient) Issue(ctx context.Context, role identity.Role, key 
 		return empty, ErrReplayExpired
 	}
 	grant.ID = id
+	grant.ExpiresAt = grant.ExpiresAt.UTC()
 	return grant, nil
 }
 
