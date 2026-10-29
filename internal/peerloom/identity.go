@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/barry-ran/quick-mirror-service/internal/access"
 	"github.com/barry-ran/quick-mirror-service/internal/identity"
 )
 
@@ -57,8 +58,38 @@ func NewIdentityClient(config IdentityConfig, client *http.Client) (*IdentityCli
 	return &IdentityClient{endpoint: origin.String(), tenantID: tenant, pcApplicationID: pc, mobileApplicationID: mobile, client: &httpClient}, nil
 }
 
+type identityResponse struct {
+	Principal identity.Principal
+	Expiry    json.RawMessage
+}
+
 func (c *IdentityClient) Verify(ctx context.Context, credential string) (identity.Principal, error) {
-	var empty identity.Principal
+	result, err := c.fetchIdentity(ctx, credential)
+	return result.Principal, err
+}
+
+// VerifyCredential 适配待发布的公开期限字段；缺字段时失败关闭，不猜测客户端期限。
+// 当前仅有契约夹具验证，未挂载生产 exchange，须等待上游发布及真实联调。
+func (c *IdentityClient) VerifyCredential(ctx context.Context, credential string) (access.VerifiedCredential, error) {
+	var empty access.VerifiedCredential
+	result, err := c.fetchIdentity(ctx, credential)
+	if err != nil {
+		return empty, err
+	}
+	var value string
+	if len(result.Expiry) == 0 || json.Unmarshal(result.Expiry, &value) != nil || value == "" {
+		return empty, identity.ErrUnavailable
+	}
+	expiry, err := time.Parse(time.RFC3339Nano, value)
+	if err != nil || expiry.IsZero() {
+		return empty, identity.ErrUnavailable
+	}
+	// 与数据库时钟比较及15分钟上界在 access.Store 内执行，避免宿主时钟代替权威时钟。
+	return access.VerifiedCredential{Principal: result.Principal, ExpiresAt: expiry.UTC()}, nil
+}
+
+func (c *IdentityClient) fetchIdentity(ctx context.Context, credential string) (identityResponse, error) {
+	var empty identityResponse
 	if len(credential) == 0 || len(credential) > 512 || strings.IndexFunc(credential, func(r rune) bool { return r <= ' ' || r >= 127 }) >= 0 {
 		return empty, identity.ErrInvalidCredential
 	}
@@ -88,9 +119,10 @@ func (c *IdentityClient) Verify(ctx context.Context, credential string) (identit
 		return empty, identity.ErrUnavailable
 	}
 	var device struct {
-		DeviceID      string `json:"device_id"`
-		ApplicationID string `json:"application_id"`
-		TenantID      string `json:"tenant_id"`
+		DeviceID            string          `json:"device_id"`
+		ApplicationID       string          `json:"application_id"`
+		TenantID            string          `json:"tenant_id"`
+		CredentialExpiresAt json.RawMessage `json:"credential_expires_at"`
 	}
 	if err := json.Unmarshal(data, &device); err != nil {
 		return empty, identity.ErrUnavailable
@@ -113,5 +145,5 @@ func (c *IdentityClient) Verify(ctx context.Context, credential string) (identit
 	default:
 		return empty, identity.ErrForbidden
 	}
-	return identity.Principal{DeviceID: id, TenantID: tenant, ApplicationID: application, Role: role}, nil
+	return identityResponse{Principal: identity.Principal{DeviceID: id, TenantID: tenant, ApplicationID: application, Role: role}, Expiry: device.CredentialExpiresAt}, nil
 }
