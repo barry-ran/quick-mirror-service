@@ -19,7 +19,7 @@ func TestRegistrationPublicRequest(t *testing.T) {
 	for _, role := range []identity.Role{identity.PC, identity.Mobile} {
 		t.Run(string(role), func(t *testing.T) {
 			var calls atomic.Int32
-			expiry := time.Now().Add(time.Minute).UTC().Truncate(time.Second)
+			expiry := time.Now().Add(time.Minute).In(time.FixedZone("fixture", 5*3600)).Truncate(time.Second)
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				calls.Add(1)
 				if r.Method != "POST" || r.URL.Path != "/v1/registration-grants" || r.Header.Get("Authorization") != "Bearer svc_fixture" || r.Header.Get("Idempotency-Key") != "same-key-123" || r.Header.Get("Content-Type") != "application/json" {
@@ -46,7 +46,7 @@ func TestRegistrationPublicRequest(t *testing.T) {
 			}
 			for i := 0; i < 2; i++ {
 				grant, err := client.Issue(context.Background(), role, "same-key-123", 0)
-				if err != nil || grant.ID != deviceID || grant.Grant != "reg_fixture" || !grant.ExpiresAt.Equal(expiry) {
+				if err != nil || grant.ID != deviceID || grant.Grant != "reg_fixture" || !grant.ExpiresAt.Equal(expiry) || grant.ExpiresAt.Location() != time.UTC {
 					t.Fatalf("invalid grant response: %v", err)
 				}
 			}
