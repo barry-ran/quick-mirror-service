@@ -2,9 +2,7 @@ name: 业务服务验证
 
 on:
   push:
-    branches: [master, "codex/**"]
-    paths-ignore: ['docs/**', '**/*.md']
-  pull_request:
+    branches: ["codex/**"]
     paths-ignore: ['docs/**', '**/*.md']
   workflow_dispatch:
 

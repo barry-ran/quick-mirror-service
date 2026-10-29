@@ -69,6 +69,7 @@ func TestVerifiedDatabaseTLSAndHTTPSLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.Database = u.String()
+	verifyReleased := prepareReleasedRuntime(t, &c)
 	private, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -92,6 +93,19 @@ func TestVerifiedDatabaseTLSAndHTTPSLifecycle(t *testing.T) {
 	if err := serve(ctx, c, true); err != nil {
 		t.Fatalf("migration failed: %v", err)
 	}
+	// 必需的boot去重表缺失时不得启动一个表面健康但状态上报必败的进程。
+	if _, err := admin.Exec(ctx, `ALTER TABLE `+schema+`.qm_device_boots RENAME TO qm_device_boots_absent`); err != nil {
+		t.Fatal(err)
+	}
+	missingCtx, missingCancel := context.WithTimeout(ctx, time.Second)
+	missingErr := serve(missingCtx, c, false)
+	missingCancel()
+	if missingErr == nil || missingErr.Error() != "MIGRATION_REQUIRED" {
+		t.Fatal("missing boot table did not fail closed")
+	}
+	if _, err := admin.Exec(ctx, `ALTER TABLE `+schema+`.qm_device_boots_absent RENAME TO qm_device_boots`); err != nil {
+		t.Fatal(err)
+	}
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -101,7 +115,18 @@ func TestVerifiedDatabaseTLSAndHTTPSLifecycle(t *testing.T) {
 	running, cancel := context.WithCancel(ctx)
 	defer cancel()
 	done := make(chan error, 1)
-	go func() { done <- serve(running, c, false) }()
+	go func() { defer close(done); done <- serve(running, c, false) }()
+	defer func() {
+		cancel()
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Errorf("runtime cleanup failed: %v", err)
+			}
+		case <-time.After(16 * time.Second):
+			t.Error("runtime cleanup deadline exceeded")
+		}
+	}()
 	roots := x509.NewCertPool()
 	roots.AppendCertsFromPEM(certificate)
 	transport := &http.Transport{TLSClientConfig: &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12}}
@@ -130,6 +155,9 @@ func TestVerifiedDatabaseTLSAndHTTPSLifecycle(t *testing.T) {
 		cancel()
 		<-done
 		t.Fatal("HTTPS readiness failed")
+	}
+	if verifyReleased != nil {
+		verifyReleased(client, "https://"+c.Address)
 	}
 	cancel()
 	select {

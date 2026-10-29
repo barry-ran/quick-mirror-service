@@ -3,17 +3,22 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/barry-ran/quick-mirror-service/internal/access"
 	"github.com/barry-ran/quick-mirror-service/internal/bootstrap"
 	"github.com/barry-ran/quick-mirror-service/internal/catalog"
 	"github.com/barry-ran/quick-mirror-service/internal/httpapi"
@@ -28,6 +33,9 @@ type config struct {
 	Address           string
 	CertificateFile   string
 	KeyFile           string
+	AccessKey         []byte
+	APIConcurrency    int
+	upstreamClient    *http.Client // 测试注入受信CA；生产始终使用系统信任与严格HTTPS。
 }
 
 func loadConfig() (config, error) {
@@ -54,6 +62,14 @@ func loadConfig() (config, error) {
 		return c, err
 	}
 	c.HTTP.RequestsPerSecond = float64(rate)
+	c.APIConcurrency, err = positiveInt("QM_API_CONCURRENCY", 64)
+	if err != nil || c.APIConcurrency > 4096 {
+		return c, errors.New("INVALID_RESOURCE_BUDGET")
+	}
+	c.AccessKey, err = readAccessKey(os.Getenv("QM_ACCESS_KEY_FILE"))
+	if err != nil {
+		return c, err
+	}
 	if c.Database == "" || c.CertificateFile == "" || c.KeyFile == "" {
 		return c, errors.New("DATABASE_AND_TLS_CONFIGURATION_REQUIRED")
 	}
@@ -65,6 +81,34 @@ func loadConfig() (config, error) {
 		return c, errors.New("INVALID_SERVICE_CONFIGURATION")
 	}
 	return c, nil
+}
+
+// 只读取运维提供的独立密钥；不自动生成/覆盖，不把内容放进错误或日志。
+func readAccessKey(path string) ([]byte, error) {
+	invalid := errors.New("ACCESS_KEY_FILE_REQUIRED")
+	before, err := os.Lstat(path)
+	if err != nil || !before.Mode().IsRegular() || (runtime.GOOS != "windows" && before.Mode().Perm()&0077 != 0) {
+		return nil, invalid
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, invalid
+	}
+	defer file.Close()
+	current, err := file.Stat()
+	if err != nil || !os.SameFile(before, current) {
+		return nil, invalid
+	}
+	data, err := io.ReadAll(io.LimitReader(file, 65))
+	if err != nil || len(data) > 64 {
+		return nil, invalid
+	}
+	text := strings.TrimSuffix(strings.TrimSuffix(string(data), "\n"), "\r")
+	key, err := base64.StdEncoding.Strict().DecodeString(text)
+	if err != nil || len(key) != 32 || base64.StdEncoding.EncodeToString(key) != text {
+		return nil, invalid
+	}
+	return key, nil
 }
 
 func positiveInt(name string, fallback int) (int, error) {
@@ -109,7 +153,7 @@ func serve(ctx context.Context, c config, migrate bool) error {
 	if err != nil {
 		return errors.New("DATABASE_UNAVAILABLE")
 	}
-	issuer, err := peerloom.NewRegistrationClient(c.HTTP.Identity, c.ServiceCredential, nil)
+	issuer, err := peerloom.NewRegistrationClient(c.HTTP.Identity, c.ServiceCredential, c.upstreamClient)
 	if err != nil {
 		return errors.New("INVALID_PEERLOOM_CONFIGURATION")
 	}
@@ -117,21 +161,29 @@ func serve(ctx context.Context, c config, migrate bool) error {
 	if err != nil {
 		return errors.New("INVALID_SERVICE_CONFIGURATION")
 	}
+	directory, err := catalog.NewStore(pool, c.HTTP.ServiceScope, c.HTTP.Identity.TenantID)
+	if err != nil {
+		return errors.New("INVALID_SERVICE_CONFIGURATION")
+	}
+	verifier, err := peerloom.NewIdentityClient(c.HTTP.Identity, c.upstreamClient)
+	if err != nil {
+		return errors.New("INVALID_PEERLOOM_CONFIGURATION")
+	}
+	tokens, err := access.NewStore(pool, c.HTTP.ServiceScope, c.HTTP.Identity.TenantID, c.AccessKey, verifier)
+	if err != nil {
+		return errors.New("INVALID_SERVICE_CONFIGURATION")
+	}
 	if migrate {
-		directory, err := catalog.NewStore(pool, c.HTTP.ServiceScope, c.HTTP.Identity.TenantID)
-		if err != nil {
-			return errors.New("INVALID_SERVICE_CONFIGURATION")
-		}
 		migration, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
-		if directory.Migrate(migration) != nil || store.Migrate(migration) != nil {
+		if directory.Migrate(migration) != nil || store.Migrate(migration) != nil || tokens.Migrate(migration) != nil {
 			return errors.New("MIGRATION_FAILED")
 		}
 		return nil
 	}
 	var schemaReady bool
 	check, cancel = context.WithTimeout(ctx, 5*time.Second)
-	err = pool.QueryRow(check, `SELECT to_regclass('qm_bootstrap_intents') IS NOT NULL`).Scan(&schemaReady)
+	err = pool.QueryRow(check, `SELECT to_regclass('qm_bootstrap_intents') IS NOT NULL AND to_regclass('qm_access_tokens') IS NOT NULL AND to_regclass('qm_access_key_usage') IS NOT NULL AND to_regclass('qm_device_catalog') IS NOT NULL AND to_regclass('qm_device_boots') IS NOT NULL`).Scan(&schemaReady)
 	cancel()
 	if err != nil || !schemaReady {
 		return errors.New("MIGRATION_REQUIRED")
@@ -144,7 +196,25 @@ func serve(ctx context.Context, c config, migrate bool) error {
 	if err != nil {
 		return errors.New("INVALID_SERVICE_CONFIGURATION")
 	}
-	server := &http.Server{Addr: c.Address, Handler: handler, TLSConfig: &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{pair}}, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
+	exchange, err := httpapi.NewExchangeHandler(tokens, directory, c.APIConcurrency)
+	if err != nil {
+		return errors.New("INVALID_SERVICE_CONFIGURATION")
+	}
+	devices, err := httpapi.NewCatalogHandler(tokens, directory, c.APIConcurrency)
+	if err != nil {
+		return errors.New("INVALID_SERVICE_CONFIGURATION")
+	}
+	routes := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/qm/v1/auth/pc/exchange", "/qm/v1/auth/device/exchange":
+			exchange.ServeHTTP(w, r)
+		case "/qm/v1/devices/resolve", "/qm/v1/device-self/status":
+			devices.ServeHTTP(w, r)
+		default:
+			handler.ServeHTTP(w, r)
+		}
+	})
+	server := &http.Server{Addr: c.Address, Handler: routes, TLSConfig: &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{pair}}, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
 	maintenance, stopMaintenance := context.WithCancel(ctx)
 	maintenanceDone := make(chan struct{})
 	go func() {
@@ -158,9 +228,12 @@ func serve(ctx context.Context, c config, migrate bool) error {
 			case <-ticker.C:
 				cleanup, cancel := context.WithTimeout(maintenance, 5*time.Second)
 				err := store.PurgeExpired(cleanup)
+				if err == nil {
+					err = tokens.PurgeExpired(cleanup)
+				}
 				cancel()
 				if err != nil && maintenance.Err() == nil {
-					fmt.Fprintln(os.Stderr, "BOOTSTRAP_RECEIPT_CLEANUP_FAILED")
+					fmt.Fprintln(os.Stderr, "SERVICE_EXPIRED_RECORD_CLEANUP_FAILED")
 				}
 			}
 		}
