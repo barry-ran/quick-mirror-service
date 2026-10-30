@@ -116,6 +116,12 @@
             "additionalProperties": {
               "$ref": "#/components/schemas/Capability"
             }
+          },
+          "runtime_proof": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "writeOnly": true,
+            "description": "32字节随机base64url无padding，只在控制运行时内存保留；不得日志/回显/安装持久化。"
           }
         }
       },

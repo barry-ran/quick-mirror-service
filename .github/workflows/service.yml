@@ -66,4 +66,4 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      - run: go test -race -tags integration ./internal/catalog ./internal/bootstrap ./internal/access ./internal/httpapi
+      - run: go test -race -tags integration ./internal/catalog ./internal/bootstrap ./internal/access ./internal/httpapi ./internal/control
