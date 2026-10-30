@@ -1,0 +1,510 @@
+{
+  "description": "结构测试不代表 SDK/真机执行通过；语义矩阵见接口与状态契约。",
+  "cases": [
+    {
+      "name": "媒体准备请求",
+      "valid": true,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "7",
+        "kind": "request",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "op": "mirror.start",
+        "params": {
+          "max_size": 720,
+          "max_fps": 15,
+          "bit_rate": 4000000
+        }
+      }
+    },
+    {
+      "name": "数字代次",
+      "valid": false,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": 7,
+        "kind": "request",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "op": "mirror.start",
+        "params": {
+          "max_size": 720,
+          "max_fps": 15,
+          "bit_rate": 4000000
+        }
+      }
+    },
+    {
+      "name": "零代次",
+      "valid": false,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "0",
+        "kind": "request",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "op": "mirror.start",
+        "params": {
+          "max_size": 720,
+          "max_fps": 15,
+          "bit_rate": 4000000
+        }
+      }
+    },
+    {
+      "name": "伪造session",
+      "valid": false,
+      "message": {
+        "v": 1,
+        "session_id": "phone",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "7",
+        "kind": "request",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "op": "mirror.start",
+        "params": {
+          "max_size": 720,
+          "max_fps": 15,
+          "bit_rate": 4000000
+        }
+      }
+    },
+    {
+      "name": "未知操作",
+      "valid": false,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "7",
+        "kind": "request",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "op": "shell.exec",
+        "params": {
+          "max_size": 720,
+          "max_fps": 15,
+          "bit_rate": 4000000
+        }
+      }
+    },
+    {
+      "name": "未知参数",
+      "valid": false,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "7",
+        "kind": "request",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "op": "mirror.start",
+        "params": {
+          "max_size": 720,
+          "max_fps": 15,
+          "bit_rate": 4000000,
+          "adb": true
+        }
+      }
+    },
+    {
+      "name": "零码率",
+      "valid": false,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "7",
+        "kind": "request",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "op": "mirror.start",
+        "params": {
+          "max_size": 720,
+          "max_fps": 15,
+          "bit_rate": 0
+        }
+      }
+    },
+    {
+      "name": "媒体准备结果",
+      "valid": true,
+      "message": {
+        "media_generation": "1",
+        "video_label": "qm.v1.video.1",
+        "control_label": "qm.v1.control.1"
+      },
+      "definition": "mirrorStartResult"
+    },
+    {
+      "name": "请求停止不是已停止",
+      "valid": true,
+      "message": {
+        "state": "REQUESTED"
+      },
+      "definition": "scriptStopResult"
+    },
+    {
+      "name": "不接受虚构停止成功",
+      "valid": false,
+      "message": {
+        "state": "SUCCESS"
+      },
+      "definition": "scriptStopResult"
+    },
+    {
+      "name": "成功响应",
+      "valid": true,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "7",
+        "kind": "response",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "ok": true,
+        "result": {}
+      }
+    },
+    {
+      "name": "失败响应",
+      "valid": true,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "7",
+        "kind": "response",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "ok": false,
+        "error": {
+          "code": "PERMISSION_REQUIRED",
+          "message": "projection",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "name": "旧媒体通知结构合法但须语义拒绝",
+      "valid": true,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "7",
+        "kind": "event",
+        "event": "mirror.stopped",
+        "event_seq": "2",
+        "payload": {
+          "media_generation": "1"
+        }
+      }
+    },
+    {
+      "name": "最大代次",
+      "valid": true,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "9223372036854775807",
+        "kind": "request",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "op": "mirror.start",
+        "params": {
+          "max_size": 720,
+          "max_fps": 15,
+          "bit_rate": 4000000
+        }
+      }
+    },
+    {
+      "name": "代次溢出",
+      "valid": false,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "9223372036854775808",
+        "kind": "request",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "op": "mirror.start",
+        "params": {
+          "max_size": 720,
+          "max_fps": 15,
+          "bit_rate": 4000000
+        }
+      }
+    },
+    {
+      "name": "前导零",
+      "valid": false,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "07",
+        "kind": "request",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "op": "mirror.start",
+        "params": {
+          "max_size": 720,
+          "max_fps": 15,
+          "bit_rate": 4000000
+        }
+      }
+    },
+    {
+      "name": "无投屏权限仍能hello",
+      "valid": true,
+      "definition": "helloResult",
+      "message": {
+        "permissions": {
+          "projection": false,
+          "accessibility": true,
+          "ime": false
+        },
+        "capabilities": {},
+        "capture": "missing",
+        "capture_geometry": null,
+        "running_script": [],
+        "rpc_major": 1,
+        "scrcpy_profile": "quick-scrcpy-control-v1"
+      }
+    },
+    {
+      "name": "完整状态",
+      "valid": true,
+      "definition": "stateResult",
+      "message": {
+        "permissions": {
+          "projection": false,
+          "accessibility": true,
+          "ime": false
+        },
+        "capabilities": {},
+        "capture": "missing",
+        "capture_geometry": null,
+        "running_script": []
+      }
+    },
+    {
+      "name": "媒体停止确认",
+      "valid": true,
+      "definition": "mirrorStopResult",
+      "message": {
+        "media_generation": "1",
+        "state": "STOPPED"
+      }
+    },
+    {
+      "name": "尺寸有符号int最大值",
+      "valid": true,
+      "definition": "stateResult",
+      "message": {
+        "permissions": {
+          "projection": false,
+          "accessibility": true,
+          "ime": false
+        },
+        "capabilities": {},
+        "capture": "missing",
+        "capture_geometry": {
+          "width": 2147483647,
+          "height": 2147483647
+        },
+        "running_script": []
+      }
+    },
+    {
+      "name": "宽度超过有符号int",
+      "valid": false,
+      "definition": "stateResult",
+      "message": {
+        "permissions": {
+          "projection": false,
+          "accessibility": true,
+          "ime": false
+        },
+        "capabilities": {},
+        "capture": "missing",
+        "capture_geometry": {
+          "width": 2147483648,
+          "height": 1280
+        },
+        "running_script": []
+      }
+    },
+    {
+      "name": "高度超过有符号int",
+      "valid": false,
+      "definition": "stateResult",
+      "message": {
+        "permissions": {
+          "projection": false,
+          "accessibility": true,
+          "ime": false
+        },
+        "capabilities": {},
+        "capture": "missing",
+        "capture_geometry": {
+          "width": 720,
+          "height": 2147483648
+        },
+        "running_script": []
+      }
+    }
+  ],
+  "attach_cases": [
+    {
+      "name": "正确代次label",
+      "generation": "1",
+      "video": "qm.v1.video.1",
+      "control": "qm.v1.control.1",
+      "valid": true
+    },
+    {
+      "name": "旧视频代不能接新Core",
+      "generation": "2",
+      "video": "qm.v1.video.1",
+      "control": "qm.v1.control.2",
+      "valid": false
+    },
+    {
+      "name": "错角色",
+      "generation": "1",
+      "video": "qm.v1.control.1",
+      "control": "qm.v1.video.1",
+      "valid": false
+    }
+  ],
+  "video_fixture": {
+    "description": "协议生成的合成字节，不含私有源码或真实屏幕。00+64name+12codec+12packet+payload。",
+    "device_name": "fixture",
+    "width": 720,
+    "height": 1280,
+    "pts_us": 1234,
+    "payload_hex": "010203",
+    "wire_hex": "006669787475726500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000068323634000002d00000050000000000000004d200000003010203"
+  },
+  "timeline_contract": {
+    "status": "实现验收输入，尚未执行；JSON/schema检查不证明运行时资源已释放",
+    "cases": [
+      {
+        "id": "partial_stream_open",
+        "steps": [
+          "hello成功",
+          "mirror.start返回media=1",
+          "video open成功",
+          "control open失败",
+          "video关闭完成",
+          "手机VideoLease.awaitDetached完成且encoder退出",
+          "Core resourcesDrained"
+        ],
+        "expect": [
+          "媒体代1失效，不能标streaming",
+          "关闭已经打开的video child和本机socket",
+          "后续迟到control成功立即关闭",
+          "逻辑控制会话保持，不能冒充intent free"
+        ]
+      },
+      {
+        "id": "start_timeout_unknown",
+        "steps": [
+          "提交mirror.start request=A",
+          "响应丢失达到30秒",
+          "state.get确认media=1正在starting",
+          "收到A迟到响应"
+        ],
+        "expect": [
+          "UI OUTCOME_UNKNOWN而非确定失败/成功",
+          "不得自动重发新request或再分配媒体",
+          "只在原owner仍有效时恢复同一预约",
+          "已cancel则迟到响应不能attach"
+        ]
+      },
+      {
+        "id": "late_permission_after_cancel",
+        "steps": [
+          "控制会话desired_mirror已设置，系统授权请求在途",
+          "mirror.start立即PERMISSION_REQUIRED，未预约媒体",
+          "用户cancel清除desired_mirror并关闭原请求owner",
+          "系统授权结果迟到成功",
+          "原投递队列继续"
+        ],
+        "expect": [
+          "授权可更新全局能力快照，但不能恢复已取消owner或自动重放start",
+          "需要仍有效的新desired_mirror和新请求才预约新代",
+          "权限不符合时start立即PERMISSION_REQUIRED，不把UI权限流程当已启动"
+        ]
+      },
+      {
+        "id": "backpressure_cancel",
+        "steps": [
+          "媒体1网络write背压未完成",
+          "用户stop使media1失效",
+          "关闭输出取消/唤醒writer等待",
+          "保持codec drain直到VideoLease.awaitDetached完成",
+          "encoder/Surface回收并join",
+          "Core resourcesDrained"
+        ],
+        "expect": [
+          "SDKclose和QThread.finished均不是手机硬件drained证明",
+          "网络write不在UI或共享capture GL线程等待",
+          "有界输出满时失败关闭整媒体代，不丢可靠流中间字节",
+          "detach前继续消费codec输出，禁止网络背压阻死截图消费者",
+          "停止单媒体不销毁共享ProjectionCoordinator授权"
+        ]
+      },
+      {
+        "id": "old_media_new_core",
+        "steps": [
+          "media1进入Closing",
+          "请求media2",
+          "media1旧video/channelReady回调迟到",
+          "media1真实drained",
+          "media2独立预约attach"
+        ],
+        "expect": [
+          "media1未drained前不接新Core",
+          "旧label/mode/context不能attach media2",
+          "每代新writer/socket/token，65+12首部只一次"
+        ]
+      },
+      {
+        "id": "active_script_survives",
+        "steps": [
+          "旧会话启动脚本S并收到真实onStart",
+          "旧会话另一命令Q仍在队列未被执行器接纳",
+          "close gate与最终执行串行化",
+          "输入和媒体owned资源drained",
+          "旧runtime提交drained ACK"
+        ],
+        "expect": [
+          "S继续运行，不计入control gate持续inflight",
+          "Q必须拒绝，不能因以前通过布尔检查执行",
+          "断开不默认调用stopAll，不重放S",
+          "显式script.stop的REQUESTED不得提前报告STOPPED"
+        ]
+      },
+      {
+        "id": "quit_before_event_loop_exit",
+        "steps": [
+          "QML close/退出按钮发requestQuit",
+          "应用停止新intent/RPC/媒体请求",
+          "每设备关闭media/control并等待各owner barriers",
+          "共享安装SDK异步shutdown/release完成",
+          "允许Qt.quit，app.exec返回"
+        ],
+        "expect": [
+          "关闭期间事件循环/SDK存储与callback仍可服务",
+          "重复退出请求共享同一Closing过程",
+          "任何drain未知则保留owner并显示未完成，不强杀/同步析构替代",
+          "不以aboutToQuit或app.exec返回后的disconnect启动正常异步收尾"
+        ]
+      }
+    ]
+  }
+}

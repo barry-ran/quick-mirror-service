@@ -1,0 +1,897 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quickmirror.invalid/api/control-session.schema.json",
+  "title": "QuickMirror v1 客户端控制会话",
+  "description": "应用协议，不是 JSON-RPC 2.0。HTTP 权威接口见 session-intents.openapi.json；上下文一致性和字节上限由宿主验证。",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/request"
+    },
+    {
+      "$ref": "#/$defs/response"
+    },
+    {
+      "$ref": "#/$defs/event"
+    }
+  ],
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "generation": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]{0,18}$",
+      "x-maximum-decimal": "9223372036854775807"
+    },
+    "empty": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {},
+      "required": []
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string"
+        },
+        "retryable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "retryable"
+      ]
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "session_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "intent_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "business_generation": {
+          "$ref": "#/$defs/generation"
+        },
+        "kind": {
+          "const": "request"
+        },
+        "request_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "op": {
+          "enum": [
+            "hello",
+            "state.get",
+            "mirror.start",
+            "mirror.stop",
+            "script.prepare",
+            "script.commit",
+            "script.start",
+            "script.stop",
+            "script.stop_all",
+            "script.status",
+            "wallpaper.set_number"
+          ]
+        },
+        "params": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "v",
+        "session_id",
+        "intent_id",
+        "business_generation",
+        "kind",
+        "request_id",
+        "op",
+        "params"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "hello"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "rpc_major": {
+                    "const": 1
+                  },
+                  "scrcpy_profile": {
+                    "const": "quick-scrcpy-control-v1"
+                  },
+                  "client_version": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "rpc_major",
+                  "scrcpy_profile",
+                  "client_version"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "state.get"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "$ref": "#/$defs/empty"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "mirror.start"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "max_size": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "max_fps": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "bit_rate": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  }
+                },
+                "required": [
+                  "max_size",
+                  "max_fps",
+                  "bit_rate"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "mirror.stop"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "media_generation": {
+                    "$ref": "#/$defs/generation"
+                  }
+                },
+                "required": [
+                  "media_generation"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "script.prepare"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "command_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "size": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 33554432
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "display_name": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "command_id",
+                  "size",
+                  "sha256",
+                  "display_name"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "script.commit"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "upload_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "upload_id"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "script.start"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "command_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "artifact_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "client_script_key": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "command_id",
+                  "artifact_id",
+                  "client_script_key"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "script.stop"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "command_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "task_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      }
+                    },
+                    "required": [
+                      "command_id",
+                      "task_id"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "command_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "client_script_key": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "command_id",
+                      "client_script_key"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "script.stop_all"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "command_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "command_id"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "script.status"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "command_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      }
+                    },
+                    "required": [
+                      "command_id"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "task_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      }
+                    },
+                    "required": [
+                      "task_id"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "wallpaper.set_number"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "number": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "number"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "v": {
+              "const": 1
+            },
+            "session_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "intent_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "business_generation": {
+              "$ref": "#/$defs/generation"
+            },
+            "kind": {
+              "const": "response"
+            },
+            "request_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "ok": {
+              "const": true
+            },
+            "result": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "v",
+            "session_id",
+            "intent_id",
+            "business_generation",
+            "kind",
+            "request_id",
+            "ok",
+            "result"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "v": {
+              "const": 1
+            },
+            "session_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "intent_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "business_generation": {
+              "$ref": "#/$defs/generation"
+            },
+            "kind": {
+              "const": "response"
+            },
+            "request_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "ok": {
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/error"
+            }
+          },
+          "required": [
+            "v",
+            "session_id",
+            "intent_id",
+            "business_generation",
+            "kind",
+            "request_id",
+            "ok",
+            "error"
+          ]
+        }
+      ]
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "session_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "intent_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "business_generation": {
+          "$ref": "#/$defs/generation"
+        },
+        "kind": {
+          "const": "event"
+        },
+        "event": {
+          "enum": [
+            "permissions.changed",
+            "capabilities.changed",
+            "mirror.started",
+            "mirror.stopped",
+            "mirror.error",
+            "script.started",
+            "script.succeeded",
+            "script.failed",
+            "script.stopped",
+            "control.error",
+            "session.closing"
+          ]
+        },
+        "event_seq": {
+          "$ref": "#/$defs/generation"
+        },
+        "payload": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "v",
+        "session_id",
+        "intent_id",
+        "business_generation",
+        "kind",
+        "event",
+        "event_seq",
+        "payload"
+      ]
+    },
+    "mirrorStartResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "media_generation": {
+          "$ref": "#/$defs/generation"
+        },
+        "video_label": {
+          "type": "string",
+          "pattern": "^qm\\.v1\\.video\\.[1-9][0-9]{0,18}$"
+        },
+        "control_label": {
+          "type": "string",
+          "pattern": "^qm\\.v1\\.control\\.[1-9][0-9]{0,18}$"
+        }
+      },
+      "required": [
+        "media_generation",
+        "video_label",
+        "control_label"
+      ]
+    },
+    "scriptStopResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "enum": [
+            "REQUESTED",
+            "STOPPED",
+            "NOT_RUNNING",
+            "NOT_STARTED"
+          ]
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "projection": {
+          "type": "boolean"
+        },
+        "accessibility": {
+          "type": "boolean"
+        },
+        "ime": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "projection",
+        "accessibility",
+        "ime"
+      ]
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "supported": {
+          "type": "boolean"
+        },
+        "available": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "supported",
+        "available"
+      ]
+    },
+    "stateResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "permissions": {
+          "$ref": "#/$defs/permissions"
+        },
+        "capabilities": {
+          "type": "object",
+          "maxProperties": 64,
+          "additionalProperties": {
+            "$ref": "#/$defs/capability"
+          }
+        },
+        "capture": {
+          "enum": [
+            "missing",
+            "granted",
+            "starting",
+            "streaming",
+            "stopped",
+            "error"
+          ]
+        },
+        "capture_geometry": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "width": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2147483647
+                },
+                "height": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2147483647
+                }
+              },
+              "required": [
+                "width",
+                "height"
+              ]
+            }
+          ]
+        },
+        "running_script": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "task_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "state": {
+                "enum": [
+                  "starting",
+                  "running",
+                  "stop_requested"
+                ]
+              }
+            },
+            "required": [
+              "task_id",
+              "state"
+            ]
+          }
+        },
+        "media_generation": {
+          "$ref": "#/$defs/generation"
+        }
+      },
+      "required": [
+        "permissions",
+        "capabilities",
+        "capture",
+        "capture_geometry",
+        "running_script"
+      ]
+    },
+    "helloResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "permissions": {
+          "$ref": "#/$defs/permissions"
+        },
+        "capabilities": {
+          "type": "object",
+          "maxProperties": 64,
+          "additionalProperties": {
+            "$ref": "#/$defs/capability"
+          }
+        },
+        "capture": {
+          "enum": [
+            "missing",
+            "granted",
+            "starting",
+            "streaming",
+            "stopped",
+            "error"
+          ]
+        },
+        "capture_geometry": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "width": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2147483647
+                },
+                "height": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2147483647
+                }
+              },
+              "required": [
+                "width",
+                "height"
+              ]
+            }
+          ]
+        },
+        "running_script": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "task_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "state": {
+                "enum": [
+                  "starting",
+                  "running",
+                  "stop_requested"
+                ]
+              }
+            },
+            "required": [
+              "task_id",
+              "state"
+            ]
+          }
+        },
+        "media_generation": {
+          "$ref": "#/$defs/generation"
+        },
+        "rpc_major": {
+          "const": 1
+        },
+        "scrcpy_profile": {
+          "const": "quick-scrcpy-control-v1"
+        }
+      },
+      "required": [
+        "permissions",
+        "capabilities",
+        "capture",
+        "capture_geometry",
+        "running_script",
+        "rpc_major",
+        "scrcpy_profile"
+      ]
+    },
+    "mirrorStopResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "media_generation": {
+          "$ref": "#/$defs/generation"
+        },
+        "state": {
+          "const": "STOPPED"
+        }
+      },
+      "required": [
+        "media_generation",
+        "state"
+      ]
+    }
+  }
+}
