@@ -2,6 +2,8 @@ package catalog
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
 	_ "embed"
 	"encoding/json"
 	"errors"
@@ -13,6 +15,9 @@ import (
 
 //go:embed migrations/001_catalog.sql
 var migration string
+
+//go:embed migrations/002_runtime.sql
+var runtimeMigration string
 
 type Store struct {
 	pool   *pgxpool.Pool
@@ -31,7 +36,7 @@ func NewStore(pool *pgxpool.Pool, scope, tenant string) (*Store, error) {
 
 // Migrate 由部署迁移入口显式调用，普通请求不能触发 schema 变更。
 func (s *Store) Migrate(ctx context.Context) error {
-	_, err := s.pool.Exec(ctx, migration)
+	_, err := s.pool.Exec(ctx, migration+"\n"+runtimeMigration)
 	return err
 }
 
@@ -97,6 +102,9 @@ func (s *Store) UpdateStatus(ctx context.Context, principal identity.Principal, 
 		return err
 	}
 	boot, _ := identity.NormalizeUUID(status.BootID)
+	proofHash, _ := RuntimeProofHash(status.RuntimeProof)
+	payload, _ := json.Marshal(status)
+	payloadHash := sha256.Sum256(payload)
 	permissions, err := json.Marshal(status.Permissions)
 	if err != nil {
 		return err
@@ -112,8 +120,9 @@ func (s *Store) UpdateStatus(ctx context.Context, principal identity.Principal, 
 	defer tx.Rollback(ctx)
 	var currentBoot *string
 	var currentSequence int64
-	err = tx.QueryRow(ctx, `SELECT boot_id::text,status_seq FROM qm_device_catalog
-WHERE service_scope=$1 AND device_uuid=$2 AND application_id=$3 FOR UPDATE`, s.scope, id, application).Scan(&currentBoot, &currentSequence)
+	var currentProof, currentPayload []byte
+	err = tx.QueryRow(ctx, `SELECT boot_id::text,status_seq,runtime_proof_hash,status_payload_hash FROM qm_device_catalog
+WHERE service_scope=$1 AND device_uuid=$2 AND application_id=$3 FOR UPDATE`, s.scope, id, application).Scan(&currentBoot, &currentSequence, &currentProof, &currentPayload)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrNotFound
 	}
@@ -121,6 +130,12 @@ WHERE service_scope=$1 AND device_uuid=$2 AND application_id=$3 FOR UPDATE`, s.s
 		return err
 	}
 	if currentBoot != nil && *currentBoot == boot {
+		if len(currentProof) > 0 && subtle.ConstantTimeCompare(currentProof, proofHash) != 1 {
+			return ErrStaleStatus
+		}
+		if len(proofHash) > 0 && status.Sequence == currentSequence && subtle.ConstantTimeCompare(currentPayload, payloadHash[:]) == 1 {
+			return nil
+		}
 		if status.Sequence <= currentSequence {
 			return ErrStaleStatus
 		}
@@ -136,8 +151,8 @@ WHERE service_scope=$1 AND device_uuid=$2 AND application_id=$3 FOR UPDATE`, s.s
 			return err
 		}
 	}
-	_, err = tx.Exec(ctx, `UPDATE qm_device_catalog SET boot_id=$3,status_seq=$4,app_version=$5,permissions=$6,capabilities=$7,updated_at=clock_timestamp()
-WHERE service_scope=$1 AND device_uuid=$2`, s.scope, id, boot, status.Sequence, status.AppVersion, permissions, capabilities)
+	_, err = tx.Exec(ctx, `UPDATE qm_device_catalog SET boot_id=$3,status_seq=$4,app_version=$5,permissions=$6,capabilities=$7,runtime_proof_hash=$8,status_payload_hash=$9,updated_at=clock_timestamp()
+WHERE service_scope=$1 AND device_uuid=$2`, s.scope, id, boot, status.Sequence, status.AppVersion, permissions, capabilities, proofHash, payloadHash[:])
 	if err != nil {
 		return err
 	}

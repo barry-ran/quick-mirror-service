@@ -2,6 +2,8 @@
 package catalog
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -31,6 +33,7 @@ type Capability struct {
 }
 
 type Status struct {
+	RuntimeProof string                `json:"runtime_proof,omitempty"`
 	BootID       string                `json:"boot_id"`
 	Sequence     int64                 `json:"seq"`
 	AppVersion   string                `json:"app_version"`
@@ -57,6 +60,11 @@ func validVersion(version string) bool {
 }
 
 func (s Status) validate() error {
+	if s.RuntimeProof != "" {
+		if _, ok := RuntimeProofHash(s.RuntimeProof); !ok {
+			return ErrInvalidInput
+		}
+	}
 	if _, ok := identity.NormalizeUUID(s.BootID); !ok || s.Sequence <= 0 || !validVersion(s.AppVersion) || len(s.Capabilities) > 64 {
 		return ErrInvalidInput
 	}
@@ -73,4 +81,14 @@ func encodeCapabilities(capabilities map[string]Capability) ([]byte, error) {
 		return []byte("{}"), nil
 	}
 	return json.Marshal(capabilities)
+}
+
+// RuntimeProofHash接受32字节随机URL-safe凭证；调用者不得记录或回显原值。
+func RuntimeProofHash(proof string) ([]byte, bool) {
+	b, e := base64.RawURLEncoding.DecodeString(proof)
+	if e != nil || len(b) != 32 || base64.RawURLEncoding.EncodeToString(b) != proof {
+		return nil, false
+	}
+	h := sha256.Sum256(b)
+	return h[:], true
 }

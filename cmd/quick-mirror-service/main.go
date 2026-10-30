@@ -21,6 +21,7 @@ import (
 	"github.com/barry-ran/quick-mirror-service/internal/access"
 	"github.com/barry-ran/quick-mirror-service/internal/bootstrap"
 	"github.com/barry-ran/quick-mirror-service/internal/catalog"
+	"github.com/barry-ran/quick-mirror-service/internal/control"
 	"github.com/barry-ran/quick-mirror-service/internal/httpapi"
 	"github.com/barry-ran/quick-mirror-service/internal/peerloom"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -34,6 +35,7 @@ type config struct {
 	CertificateFile   string
 	KeyFile           string
 	AccessKey         []byte
+	ControlGrantTTL   int
 	APIConcurrency    int
 	upstreamClient    *http.Client // 测试注入受信CA；生产始终使用系统信任与严格HTTPS。
 }
@@ -65,6 +67,10 @@ func loadConfig() (config, error) {
 	c.APIConcurrency, err = positiveInt("QM_API_CONCURRENCY", 64)
 	if err != nil || c.APIConcurrency > 4096 {
 		return c, errors.New("INVALID_RESOURCE_BUDGET")
+	}
+	c.ControlGrantTTL, err = positiveInt("QM_CONTROL_GRANT_TTL_SECONDS", 300)
+	if err != nil || c.ControlGrantTTL > 30*24*3600 {
+		return c, errors.New("INVALID_CONTROL_GRANT_TTL")
 	}
 	c.AccessKey, err = readAccessKey(os.Getenv("QM_ACCESS_KEY_FILE"))
 	if err != nil {
@@ -173,17 +179,29 @@ func serve(ctx context.Context, c config, migrate bool) error {
 	if err != nil {
 		return errors.New("INVALID_SERVICE_CONFIGURATION")
 	}
+	grantTTL := c.ControlGrantTTL
+	if grantTTL == 0 {
+		grantTTL = 300
+	}
+	transport, err := peerloom.NewControlClientWithGrantTTL(c.HTTP.Identity, c.ServiceCredential, c.upstreamClient, grantTTL)
+	if err != nil {
+		return errors.New("INVALID_CONTROL_CONFIGURATION")
+	}
+	intents, err := control.NewStore(pool, c.HTTP.ServiceScope, c.HTTP.Identity.TenantID, c.HTTP.Identity.MobileApplicationID, transport)
+	if err != nil {
+		return errors.New("INVALID_CONTROL_CONFIGURATION")
+	}
 	if migrate {
 		migration, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
-		if directory.Migrate(migration) != nil || store.Migrate(migration) != nil || tokens.Migrate(migration) != nil {
+		if directory.Migrate(migration) != nil || store.Migrate(migration) != nil || tokens.Migrate(migration) != nil || intents.Migrate(migration) != nil {
 			return errors.New("MIGRATION_FAILED")
 		}
 		return nil
 	}
 	var schemaReady bool
 	check, cancel = context.WithTimeout(ctx, 5*time.Second)
-	err = pool.QueryRow(check, `SELECT to_regclass('qm_bootstrap_intents') IS NOT NULL AND to_regclass('qm_access_tokens') IS NOT NULL AND to_regclass('qm_access_key_usage') IS NOT NULL AND to_regclass('qm_device_catalog') IS NOT NULL AND to_regclass('qm_device_boots') IS NOT NULL`).Scan(&schemaReady)
+	err = pool.QueryRow(check, `SELECT to_regclass('qm_bootstrap_intents') IS NOT NULL AND to_regclass('qm_access_tokens') IS NOT NULL AND to_regclass('qm_access_key_usage') IS NOT NULL AND to_regclass('qm_device_catalog') IS NOT NULL AND to_regclass('qm_device_boots') IS NOT NULL AND to_regclass('qm_control_intents') IS NOT NULL AND to_regclass('qm_control_slots') IS NOT NULL AND to_regclass('qm_control_commands') IS NOT NULL`).Scan(&schemaReady)
 	cancel()
 	if err != nil || !schemaReady {
 		return errors.New("MIGRATION_REQUIRED")
@@ -204,7 +222,15 @@ func serve(ctx context.Context, c config, migrate bool) error {
 	if err != nil {
 		return errors.New("INVALID_SERVICE_CONFIGURATION")
 	}
+	controls, err := httpapi.NewControlHandler(tokens, intents, c.APIConcurrency)
+	if err != nil {
+		return errors.New("INVALID_CONTROL_CONFIGURATION")
+	}
 	routes := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/qm/v1/session-intents") || strings.HasPrefix(r.URL.Path, "/qm/v1/device-self/session-intents/") {
+			controls.ServeHTTP(w, r)
+			return
+		}
 		switch r.URL.Path {
 		case "/qm/v1/auth/pc/exchange", "/qm/v1/auth/device/exchange":
 			exchange.ServeHTTP(w, r)
@@ -219,12 +245,23 @@ func serve(ctx context.Context, c config, migrate bool) error {
 	maintenanceDone := make(chan struct{})
 	go func() {
 		defer close(maintenanceDone)
+		recovery := time.NewTicker(time.Second)
+		defer recovery.Stop()
+		cursor := ""
 		ticker := time.NewTicker(time.Hour)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-maintenance.Done():
 				return
+			case <-recovery.C:
+				recoveryCtx, cancel := context.WithTimeout(maintenance, 10*time.Second)
+				var recoveryErr error
+				cursor, recoveryErr = intents.Recover(recoveryCtx, cursor)
+				cancel()
+				if recoveryErr != nil && maintenance.Err() == nil {
+					fmt.Fprintln(os.Stderr, "SERVICE_CONTROL_RECOVERY_PENDING")
+				}
 			case <-ticker.C:
 				cleanup, cancel := context.WithTimeout(maintenance, 5*time.Second)
 				err := store.PurgeExpired(cleanup)

@@ -1,0 +1,864 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "QuickMirror 控制意图共享契约",
+    "version": "0.1.0"
+  },
+  "security": [
+    {
+      "AccessToken": []
+    }
+  ],
+  "paths": {
+    "/qm/v1/session-intents": {
+      "post": {
+        "summary": "createIntent：创建控制意图",
+        "description": "仅PC；owner从token派生，服务域由部署固定。相同command及语义只返回原意图；旧key不会重新创建。",
+        "operationId": "createIntent",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/HTTP200"
+          },
+          "201": {
+            "$ref": "#/components/responses/HTTP201"
+          },
+          "202": {
+            "$ref": "#/components/responses/HTTP202"
+          },
+          "400": {
+            "$ref": "#/components/responses/HTTP400"
+          },
+          "401": {
+            "$ref": "#/components/responses/HTTP401"
+          },
+          "403": {
+            "$ref": "#/components/responses/HTTP403"
+          },
+          "404": {
+            "$ref": "#/components/responses/HTTP404"
+          },
+          "409": {
+            "$ref": "#/components/responses/HTTP409"
+          },
+          "410": {
+            "$ref": "#/components/responses/HTTP410"
+          },
+          "429": {
+            "$ref": "#/components/responses/HTTP429"
+          },
+          "503": {
+            "$ref": "#/components/responses/HTTP503"
+          },
+          "405": {
+            "$ref": "#/components/responses/HTTP405"
+          },
+          "413": {
+            "$ref": "#/components/responses/HTTP413"
+          },
+          "415": {
+            "$ref": "#/components/responses/HTTP415"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateIntent"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/qm/v1/session-intents/by-command/{command_id}": {
+      "get": {
+        "summary": "getIntentByCommand：恢复创建结果",
+        "description": "仅发起PC，按service_scope+owner+create+command查询；未知或终态结果过期为410 UNKNOWN。",
+        "operationId": "getIntentByCommand",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/HTTP200"
+          },
+          "400": {
+            "$ref": "#/components/responses/HTTP400"
+          },
+          "401": {
+            "$ref": "#/components/responses/HTTP401"
+          },
+          "404": {
+            "$ref": "#/components/responses/HTTP404"
+          },
+          "410": {
+            "$ref": "#/components/responses/HTTP410"
+          },
+          "429": {
+            "$ref": "#/components/responses/HTTP429"
+          },
+          "503": {
+            "$ref": "#/components/responses/HTTP503"
+          },
+          "405": {
+            "$ref": "#/components/responses/HTTP405"
+          },
+          "413": {
+            "$ref": "#/components/responses/HTTP413"
+          },
+          "415": {
+            "$ref": "#/components/responses/HTTP415"
+          }
+        },
+        "parameters": [
+          {
+            "name": "command_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/qm/v1/session-intents/{intent_id}": {
+      "get": {
+        "summary": "getIntent：查询控制意图",
+        "description": "仅该owner PC或target手机；未授权资源返回404，不能凭UUID获取权限。",
+        "operationId": "getIntent",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/HTTP200"
+          },
+          "400": {
+            "$ref": "#/components/responses/HTTP400"
+          },
+          "401": {
+            "$ref": "#/components/responses/HTTP401"
+          },
+          "404": {
+            "$ref": "#/components/responses/HTTP404"
+          },
+          "410": {
+            "$ref": "#/components/responses/HTTP410"
+          },
+          "429": {
+            "$ref": "#/components/responses/HTTP429"
+          },
+          "503": {
+            "$ref": "#/components/responses/HTTP503"
+          },
+          "405": {
+            "$ref": "#/components/responses/HTTP405"
+          },
+          "413": {
+            "$ref": "#/components/responses/HTTP413"
+          },
+          "415": {
+            "$ref": "#/components/responses/HTTP415"
+          }
+        },
+        "parameters": [
+          {
+            "name": "intent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/qm/v1/session-intents/{intent_id}/close": {
+      "post": {
+        "summary": "closeIntent：发起关闭",
+        "description": "仅参与者；user_pc只允许owner PC，user_phone只允许target手机。进入draining不是released。",
+        "operationId": "closeIntent",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/HTTP200"
+          },
+          "202": {
+            "$ref": "#/components/responses/HTTP202"
+          },
+          "400": {
+            "$ref": "#/components/responses/HTTP400"
+          },
+          "401": {
+            "$ref": "#/components/responses/HTTP401"
+          },
+          "403": {
+            "$ref": "#/components/responses/HTTP403"
+          },
+          "404": {
+            "$ref": "#/components/responses/HTTP404"
+          },
+          "409": {
+            "$ref": "#/components/responses/HTTP409"
+          },
+          "410": {
+            "$ref": "#/components/responses/HTTP410"
+          },
+          "429": {
+            "$ref": "#/components/responses/HTTP429"
+          },
+          "503": {
+            "$ref": "#/components/responses/HTTP503"
+          },
+          "405": {
+            "$ref": "#/components/responses/HTTP405"
+          },
+          "413": {
+            "$ref": "#/components/responses/HTTP413"
+          },
+          "415": {
+            "$ref": "#/components/responses/HTTP415"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseIntent"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "intent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/qm/v1/device-self/session-intents/{intent_id}/bind": {
+      "post": {
+        "summary": "bindIntent：手机核验并关联实际会话",
+        "description": "仅target手机；target从token派生。服务查询正式Peerloom session/grant验证source/target及保存grant，匹配才关联。active表示业务关联获准，不代替SDK连接就绪。",
+        "operationId": "bindIntent",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/HTTP200"
+          },
+          "202": {
+            "$ref": "#/components/responses/HTTP202"
+          },
+          "400": {
+            "$ref": "#/components/responses/HTTP400"
+          },
+          "401": {
+            "$ref": "#/components/responses/HTTP401"
+          },
+          "403": {
+            "$ref": "#/components/responses/HTTP403"
+          },
+          "404": {
+            "$ref": "#/components/responses/HTTP404"
+          },
+          "409": {
+            "$ref": "#/components/responses/HTTP409"
+          },
+          "410": {
+            "$ref": "#/components/responses/HTTP410"
+          },
+          "429": {
+            "$ref": "#/components/responses/HTTP429"
+          },
+          "503": {
+            "$ref": "#/components/responses/HTTP503"
+          },
+          "405": {
+            "$ref": "#/components/responses/HTTP405"
+          },
+          "413": {
+            "$ref": "#/components/responses/HTTP413"
+          },
+          "415": {
+            "$ref": "#/components/responses/HTTP415"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BindIntent"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "intent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/qm/v1/device-self/session-intents/{intent_id}/drained": {
+      "post": {
+        "summary": "ackIntentDrained：确认旧执行入口已关闭",
+        "description": "仅target手机；只有上游授权已确认撤销后才可得到本代drain_token。匹配绑定session和代次后提交；grant未知或未确认撤销不得释放。",
+        "operationId": "ackIntentDrained",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/HTTP200"
+          },
+          "202": {
+            "$ref": "#/components/responses/HTTP202"
+          },
+          "400": {
+            "$ref": "#/components/responses/HTTP400"
+          },
+          "401": {
+            "$ref": "#/components/responses/HTTP401"
+          },
+          "403": {
+            "$ref": "#/components/responses/HTTP403"
+          },
+          "404": {
+            "$ref": "#/components/responses/HTTP404"
+          },
+          "409": {
+            "$ref": "#/components/responses/HTTP409"
+          },
+          "410": {
+            "$ref": "#/components/responses/HTTP410"
+          },
+          "429": {
+            "$ref": "#/components/responses/HTTP429"
+          },
+          "503": {
+            "$ref": "#/components/responses/HTTP503"
+          },
+          "405": {
+            "$ref": "#/components/responses/HTTP405"
+          },
+          "413": {
+            "$ref": "#/components/responses/HTTP413"
+          },
+          "415": {
+            "$ref": "#/components/responses/HTTP415"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DrainedIntent"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "intent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/qm/v1/device-self/session-intents/current": {
+      "get": {
+        "operationId": "getCurrentDeviceIntent",
+        "summary": "手机查询自身当前占用",
+        "description": "仅手机角色，target由token派生；用于incoming source/session核验前获取intent和进程重启恢复，不依赖尚未建立的RPC。无活跃slot为204（无正文）；有reserving/active/draining为200。",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/HTTP200"
+          },
+          "400": {
+            "$ref": "#/components/responses/HTTP400"
+          },
+          "401": {
+            "$ref": "#/components/responses/HTTP401"
+          },
+          "403": {
+            "$ref": "#/components/responses/HTTP403"
+          },
+          "429": {
+            "$ref": "#/components/responses/HTTP429"
+          },
+          "503": {
+            "$ref": "#/components/responses/HTTP503"
+          },
+          "204": {
+            "$ref": "#/components/responses/HTTP204"
+          },
+          "405": {
+            "$ref": "#/components/responses/HTTP405"
+          },
+          "413": {
+            "$ref": "#/components/responses/HTTP413"
+          },
+          "415": {
+            "$ref": "#/components/responses/HTTP415"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "AccessToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "opaque"
+      }
+    },
+    "schemas": {
+      "CreateIntent": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "device_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "relay_mode": {
+            "type": "string",
+            "const": "default"
+          }
+        },
+        "required": [
+          "command_id",
+          "device_uuid"
+        ]
+      },
+      "CloseIntent": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "user_pc",
+              "user_phone",
+              "error"
+            ]
+          }
+        },
+        "required": [
+          "command_id",
+          "reason"
+        ]
+      },
+      "BindIntent": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "business_generation": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "业务代次，正十进制字符串；数值最大9223372036854775807，解析/增加溢出失败关闭，不回绕。",
+            "x-maximum-decimal": "9223372036854775807"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "boot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "runtime_proof": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "writeOnly": true,
+            "description": "32字节随机base64url无padding，只在控制运行时内存保留；不得日志/回显/安装持久化。"
+          }
+        },
+        "required": [
+          "command_id",
+          "business_generation",
+          "session_id",
+          "boot_id",
+          "runtime_proof"
+        ]
+      },
+      "DrainedIntent": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "business_generation": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "业务代次，正十进制字符串；数值最大9223372036854775807，解析/增加溢出失败关闭，不回绕。",
+            "x-maximum-decimal": "9223372036854775807"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "仅已有绑定时必须提供并严格匹配；未绑定时必须省略，不能伪造会话。"
+          },
+          "drain_token": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "boot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "runtime_proof": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "writeOnly": true,
+            "description": "32字节随机base64url无padding，只在控制运行时内存保留；不得日志/回显/安装持久化。"
+          }
+        },
+        "required": [
+          "command_id",
+          "business_generation",
+          "drain_token",
+          "boot_id",
+          "runtime_proof"
+        ]
+      },
+      "Intent": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "intent_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "device_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_pc_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "business_generation": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "业务代次，正十进制字符串；数值最大9223372036854775807，解析/增加溢出失败关闭，不回绕。",
+            "x-maximum-decimal": "9223372036854775807"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "reserving",
+              "active",
+              "draining",
+              "released",
+              "failed"
+            ]
+          },
+          "operation_outcome": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "confirmed",
+              "unknown"
+            ]
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "drain_token": {
+            "type": "string",
+            "format": "uuid",
+            "description": "仅target手机可见；已知grant确认撤销后生成，PC不得代替手机ACK。"
+          },
+          "close_reason": {
+            "type": "string",
+            "enum": [
+              "user_pc",
+              "user_phone",
+              "error"
+            ]
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "x-maximum-decimal": "9223372036854775807",
+            "description": "意图快照修订号，不是业务代次；最大9223372036854775807，溢出失败关闭。"
+          },
+          "retry_after_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 60000
+          }
+        },
+        "required": [
+          "intent_id",
+          "device_uuid",
+          "owner_pc_uuid",
+          "business_generation",
+          "state",
+          "operation_outcome",
+          "revision"
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "INVALID_INPUT",
+              "AUTH_INVALID",
+              "FORBIDDEN",
+              "DEVICE_NOT_FOUND",
+              "DEVICE_OFFLINE",
+              "DEVICE_OCCUPIED",
+              "INTENT_NOT_FOUND",
+              "IDEMPOTENCY_CONFLICT",
+              "UNKNOWN",
+              "STALE_GENERATION",
+              "SESSION_MISMATCH",
+              "SESSION_UNAVAILABLE",
+              "INTENT_CLOSING",
+              "DRAIN_NOT_READY",
+              "RELAY_CONFIG_UNSUPPORTED",
+              "OUTCOME_UNKNOWN",
+              "SERVICE_UNAVAILABLE",
+              "RESOURCE_EXHAUSTED",
+              "RUNTIME_NOT_READY",
+              "RUNTIME_MISMATCH",
+              "METHOD_NOT_ALLOWED",
+              "REQUEST_TOO_LARGE",
+              "UNSUPPORTED_MEDIA_TYPE"
+            ],
+            "description": "UNKNOWN：未找到/详细结果已过期，只能查询已知intent，不得将旧command重发为新操作。OUTCOME_UNKNOWN：上游变更结果不明，保留原intent/占用，允许GET查询；不是create重试许可。"
+          },
+          "message": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "retry_after_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 60000
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "retryable"
+        ]
+      },
+      "IntentResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Intent"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "error": {
+            "$ref": "#/components/schemas/Error"
+          }
+        },
+        "required": [
+          "request_id",
+          "error"
+        ]
+      }
+    },
+    "responses": {
+      "HTTP200": {
+        "description": "同一意图当前状态；不是传输connected或资源drained的替代证明",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/IntentResponse"
+            }
+          }
+        }
+      },
+      "HTTP201": {
+        "description": "创建并持久保存业务意图；session_id尚不存在则省略",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/IntentResponse"
+            }
+          }
+        }
+      },
+      "HTTP202": {
+        "description": "仍在处理或恢复；只按当前意图查询，不新建授权",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/IntentResponse"
+            }
+          }
+        }
+      },
+      "HTTP400": {
+        "description": "参数或JSON错误",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "HTTP401": {
+        "description": "安装业务token失效",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "HTTP403": {
+        "description": "角色或参与者无权",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "HTTP404": {
+        "description": "资源不存在；不存在command查询使用UNKNOWN",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "HTTP409": {
+        "description": "占用、幂等冲突、旧代或状态冲突",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "HTTP410": {
+        "description": "命令结果未知/已过保留期，旧key不可作为新命令执行",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "HTTP429": {
+        "description": "可重试瞬时资源限制",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "HTTP503": {
+        "description": "不能确认上游/服务结果；不得自动换key创建授权",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "HTTP405": {
+        "description": "HTTP请求方法/正文大小/类型边界拒绝",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "HTTP413": {
+        "description": "HTTP请求方法/正文大小/类型边界拒绝",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "HTTP415": {
+        "description": "HTTP请求方法/正文大小/类型边界拒绝",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "HTTP204": {
+        "description": "该手机当前没有活跃控制意图，无正文"
+      }
+    }
+  }
+}

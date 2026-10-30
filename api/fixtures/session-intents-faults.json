@@ -1,0 +1,223 @@
+{
+  "contract_version": "0.1.0",
+  "cases": [
+    {
+      "id": "two-pcs",
+      "given": "target空闲，两认证PC并发不同command",
+      "expect": [
+        "唯一活跃slot",
+        "赢家原intent",
+        "另一PC409 DEVICE_OCCUPIED",
+        "仅赢家可dispatch grant"
+      ]
+    },
+    {
+      "id": "create-response-lost-with-trusted-replay",
+      "given": "create上游响应丢失，持久可信认证域及重放期限仍有效",
+      "expect": [
+        "同一key同body重放",
+        "不持DB事务跨网络",
+        "关联原grant",
+        "不建立第二intent"
+      ]
+    },
+    {
+      "id": "create-response-lost-no-trust",
+      "given": "无可信replay期限/认证域或无法证明请求在有效窗口",
+      "expect": [
+        "operation_outcome=unknown",
+        "继续占用target",
+        "禁止自动第二次create"
+      ]
+    },
+    {
+      "id": "receipt-expired",
+      "given": "上游响应已过期/收据可能被删除",
+      "expect": [
+        "不得把REPLAY_EXPIRED当未创建",
+        "不得盲重发create",
+        "可证明公开对账前保持unknown"
+      ]
+    },
+    {
+      "id": "credential-rotation",
+      "given": "原attempt后管理credential域发生变化",
+      "expect": [
+        "禁止用新域重复create",
+        "冻结原attempt并保留占用"
+      ]
+    },
+    {
+      "id": "grant-known-revoke-response-lost",
+      "given": "已知grant，撤销响应丢失",
+      "expect": [
+        "draining",
+        "查询同grant/session确认撤销事实",
+        "未知结果不free",
+        "后续恢复仅可作用于同一旧grant"
+      ]
+    },
+    {
+      "id": "bind-response-lost",
+      "given": "已关联session，手机未收到bind响应",
+      "expect": [
+        "同command/body返回原关联当前状态",
+        "不同session不能覆盖",
+        "closing拒绝迟到bind"
+      ]
+    },
+    {
+      "id": "drained-response-lost",
+      "given": "手机清理ACK响应丢失",
+      "expect": [
+        "同代同token重复ACK幂等",
+        "手机继续拒绝旧代",
+        "不重启旧执行入口"
+      ]
+    },
+    {
+      "id": "unknown-grant-phone-ack",
+      "given": "create结果未知，手机声称旧入口已清理",
+      "expect": [
+        "ACK不能消除未知grant风险",
+        "不得发drain_token",
+        "不得free"
+      ]
+    },
+    {
+      "id": "release-replay",
+      "given": "旧intent已released，重复原create command",
+      "expect": [
+        "返回原终态或410 UNKNOWN",
+        "不创建新grant",
+        "slot可free但旧intent不能复活"
+      ]
+    },
+    {
+      "id": "result-expired-command-tombstone",
+      "given": "终态响应保留24h后已清理，command摘要仍在",
+      "expect": [
+        "by-command返回410 UNKNOWN",
+        "POST同command返回410 UNKNOWN",
+        "新操作必须新command"
+      ]
+    },
+    {
+      "id": "close-bind-race",
+      "given": "close与bind/续期竞争",
+      "expect": [
+        "同slot事务串行化",
+        "draining不能回active",
+        "旧回调无执行资格"
+      ]
+    },
+    {
+      "id": "partition-suspend",
+      "given": "旧P2P分区，手机不可达或跨休眠期限未经正式包证明",
+      "expect": [
+        "保持draining",
+        "不以固定60s放新owner",
+        "不把server closed当执行器drained"
+      ]
+    },
+    {
+      "id": "phone-restart",
+      "given": "手机进程重启且曾持旧session",
+      "expect": [
+        "默认拒绝远程执行",
+        "重新认证/查询当前intent再接纳",
+        "内存清空不复活旧代",
+        "不重放script.start"
+      ]
+    },
+    {
+      "id": "foreign-scope",
+      "given": "他人PC/错误手机/跨service_scope使用正确UUID",
+      "expect": [
+        "拒绝读取或修改",
+        "不泄漏owner或drain_token"
+      ]
+    },
+    {
+      "id": "continued-script",
+      "given": "原脚本运行中控制意图关闭",
+      "expect": [
+        "不新增停止既有脚本策略",
+        "旧session不得接受新命令",
+        "SDK close不冒充script stopped"
+      ]
+    },
+    {
+      "id": "incoming-current-discovery",
+      "given": "手机收到只有source/session的SDK incoming request",
+      "expect": [
+        "先用手机认证GET current获取当前intent",
+        "无slot返回204并reject",
+        "核验source/session后bind",
+        "不依赖未建立RPC"
+      ]
+    },
+    {
+      "id": "cancel-before-bind",
+      "given": "grant已创建并查明，PC在手机bind前close",
+      "expect": [
+        "revoke已知grant",
+        "手机current读取draining和challenge",
+        "ACK省略session_id且关闭本代全部接纳门禁",
+        "不得伪造session_id",
+        "grant确认撤销且ACK后released"
+      ]
+    },
+    {
+      "id": "cancel-unknown-create",
+      "given": "create结果未知后PCclose",
+      "expect": [
+        "draining且unknown",
+        "保持target占用",
+        "不发challenge",
+        "无session的ACK也不得free"
+      ]
+    },
+    {
+      "id": "i64-boundaries",
+      "given": "generation/revision上界9223372036854775807或输入9223372036854775808",
+      "expect": [
+        "输入超界拒绝",
+        "递增溢出RESOURCE_EXHAUSTED并失败关闭",
+        "不回绕",
+        "retry_after_ms在0..60000"
+      ]
+    },
+    {
+      "id": "runtime-enrollment-proof",
+      "given": "同boot首次status/响应丢失/重试",
+      "expect": [
+        "首次登记proof hash",
+        "相同boot/seq/body/proof幂等成功",
+        "同boot更换proof拒绝",
+        "旧无proofstatus仍可目录上报但create RUNTIME_NOT_READY"
+      ]
+    },
+    {
+      "id": "new-runtime-cannot-ack-old",
+      "given": "新boot看到旧intent/drain_token，以新proof或只旧bootID提交ACK",
+      "expect": [
+        "RUNTIME_MISMATCH",
+        "slot继续占用",
+        "旧proof不出现在catalog/current/日志/数据库明文",
+        "新boot退休旧boot"
+      ]
+    },
+    {
+      "id": "grant-admission-window",
+      "given": "no_new_connections grant超过默认300s建连窗口，已建立session仍有有效SDKlease",
+      "expect": [
+        "既有session保持合法控制",
+        "原session恢复不重发grant",
+        "不得以grant自然到期free",
+        "关闭显式revoke",
+        "创建新session先安全释放原intent"
+      ]
+    }
+  ]
+}
