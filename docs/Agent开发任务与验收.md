@@ -1,6 +1,6 @@
 # 无 ADB 群控 Agent 开发任务与验收
 
-版本1.0，2026-10-29。按《无ADB群控产品PRD》1.2、《技术开发文档》和《接口与状态契约》实施。这里的模块名和新增接口是实现要求，不是现成代码。不得仅提交页面或假数据声称完成。
+架构收敛版本，2026-10-30。按《无ADB群控产品PRD》1.2、《技术开发文档》和《接口与状态契约》实施。这里的模块名和新增接口是实现要求，不是现成代码。不得仅提交页面或假数据声称完成。
 
 ## 1 开工规则
 
@@ -15,7 +15,7 @@
 
 ### T00 版本和集成基线
 
-输入：四个本地仓库、Peerloom 固定提交。
+输入：各产品仓库固定提交；PC/AutoX SDK实际锁定v0.1.2的发行锁文件，Peerloom服务端/API正式v0.1.3（0b0d2962cd36338e1a92f3321c60d26ede1fdb51）。验证实际版本组合，不要求无必要SDK升级；候选PR源码不是消费依赖。
 
 输出：`implementation-baseline.json`（各 SHA、工具链、平台、协议标识），现有 PC/Android 正常连接字节样本，新增接口 OpenAPI/JSON Schema 初版，PC/手机 Peerloom 安装实例身份接入方式。
 
@@ -23,17 +23,21 @@
 
 完成标准：原 PC 与匹配 jar 的消息编号/字段可对照，58–61 冲突有回归样本；PC/手机实例凭证真实验证，原账号服务校验不列为前置条件。新产品存储域与旧版隔离。
 
-### T01 Peerloom 动态容量与原生 ABI
+### T01 正式 SDK 容量与原生 ABI 验证
 
-依赖 T00。修改 Rust、C ABI、配置 schema、封装及服务端配额，默认不设置固定连接台数上限，并支持随资源增长的活动操作容量；移除产品路径上的固定台数上限，扩大/动态调整操作信用并保留管理操作通路。实现 armeabi-v7a 库，保留 arm64-v8a，minSdk与宿主API26兼容。
+依赖 T00。先核对并测试正式包，不按旧32连接/32操作额度重复实现已发布能力。产品不设置固定台数上限，验证活动操作容量、资源回收及管理通路。ARM32 仍需正式库和运行证据，当前v0.1.2正式AAR缺少ARM32，v0.1.3构建配置也只列arm64-v8a/x86_64；若需通用改库，独立发布后消费。minSdk与宿主API26兼容。
 
 验收：33、101、501及更高模拟/实际 SDK 连接不因写死数量拒绝；所有流有 pending read 时依然能 close/refresh/open；随机连接关闭不会串回调；背压不造成无界内存。分别报告模拟连接、真实 PeerConnection、真实手机三种结果，不能混用。
 
-### T02 Peerloom 独占和 TURN 扩展
+### T02 业务控制占用与通用连接授权
 
-依赖 T01，按契约实现 exclusive_target、prepare-exclusive-session、connectPrepared、会话级 relay profile、设备凭证验证 adapter。接入既有 grant/lease/transport generation。
+依赖 T00 的公开身份契约；不依赖候选 prepare-exclusive-session/connectPrepared。实现业务 PostgreSQL 控制意图、公共 grant/session adapter、固定幂等 key 和 free/reserving/active/draining 恢复。PC 普通 connect，手机通过已有 accept/reject 与最终执行门禁验证当前 owner/意图/session。业务代次不下沉 Peerloom，不修改 scrcpy 字节协议。
 
-验收：不同 source 同 target 的并发请求只能一个生效；grant不同也不能绕过；旧 epoch 到期、服务重启、Redis重启、WSS断开、时钟回拨/手机休眠后不接受旧操作；双方自定义 TURN profile 一致；custom无默认回退；有效默认短期TURN刷新仍工作。测试真实 PostgreSQL、真实 coturn 与双 SDK。
+验收：双PC竞争只产生一个活跃控制意图；创建grant/绑定session/撤销响应丢失、进程重启均恢复原尝试；不同grant不能绕过手机门禁；关闭后新owner必须等认证手机清理ACK或可靠最大截止时间证据。WSS分区、时钟回拨和休眠恢复不得执行旧输入；SDK可靠截止未证明时保持draining，不用固定60s强行放行。已运行脚本可继续，不得因此接受旧会话的新命令，重连不重放启动。
+
+补齐常规续期任务：安装credential刷新、业务token重新exchange、SDK租约更新与grant期限策略分别验证；持续连接跨过各期限不误释放，不重复连接/脚本。测试续期与close并发、迟到成功、认证撤销及上游不可达；关闭进入draining后不得由续期回调复活。不假定有公开grant更新接口，实际组合中无法闭环的点记录为明确缺口。
+
+自建 TURN 单列公开接口缺口验证与通用扩展发行任务，不阻塞默认TURN的连接闭环开发；不能假称需求取消或已经完成。最终验收仍包括双方配置一致、custom不回退、默认短期凭证刷新以及真实coturn。通用租约时钟/ARM32问题同样单独证明、修复和发布，不夹带产品占用语义。
 
 ### T03 Android 核心可行性闸门
 
@@ -45,15 +49,17 @@
 
 ### T04 业务服务和设备目录
 
-依赖 T02/T00 的 Peerloom 安装身份契约。实现 `/qm/v1` 安装身份交换、PC和手机注册、UUID批量查询、状态快照/推送、relay profile、会话意图；服务端只通过可信 Peerloom adapter 操作会话，不复制另一份独占锁。
+依赖 T00；已有安装身份交换、PC/手机bootstrap与目录HTTP保留并按当前OpenAPI验证。补齐公开presence聚合、状态快照/推送、T02控制意图与恢复；relay profile跟随正式公开能力接线。业务库只决定控制占用，Peerloom拥有网络会话/租约；不读其私表、不建立同义Redis锁，不声称跨库原子提交。
 
 验收：安装凭证有效/无效/过期及PC/手机角色隔离，手机凭证不能假冒其他UUID；手机无录屏权限也能注册并显示在线；已注册离线设备可添加；超过单批大小自动分批且无总数限制；事件丢失/resync恢复；配置不输出秘密。
 
 ### T05 PC 会话与原字节流
 
-依赖 T01–T04。新增 PeerloomClient、DeviceSessionManager、LocalStreamBridge 和 Server APK transport 分支。替换设备发现来源，保持原列表更新信号；serial 映射 UUID。
+依赖 T00、T01正式包验证、T02最小占用闭环和T03/T04相关接口；默认TURN路径不等待自建TURN候选扩展。新增 PeerloomClient、DeviceSessionManager、LocalStreamBridge 和 Server APK transport 分支。替换设备发现来源，保持原列表更新信号；serial 映射 UUID。
 
-验收：无 adb.exe 存在时仍可运行核心功能；APK模式启动没有push/forward/reverse；video/control接入口角色固定、token隔离；网络分片和高延迟下握手成功，不依赖70ms；旧 media_generation 不进入新解码器；切画质仍使用原控制字段。连接与投屏分离，主动断开不抢回。 每次 connectDevice/disconnect 按调用恰好一次通知成功或失败；覆盖忙碌/重复请求、取消、超时、连接中断开、远端断线、同步回调析构和迟到旧代次回调。检查逐调用关联与有限期限完成，不只统计总次数；不得以静默忽略请求规避通知。
+验收：无 adb.exe 存在时仍可运行核心功能；APK模式启动没有push/forward/reverse；video/control接入口角色固定、token隔离；网络分片和高延迟下握手成功，不依赖70ms；旧 media_generation 不进入新解码器；切画质仍使用原控制字段。连接与投屏分离，主动断开不抢回。 每次 connectDevice/disconnect 按调用恰好一次通知成功或失败；覆盖忙碌/重复请求、取消、超时、连接中断开、远端断线、同步回调析构和迟到旧代次回调。检查逐调用关联与有限期限完成，不只统计总次数；不得以静默忽略请求规避通知；禁止使用嵌套QEventLoop等待异步结果。
+
+异步退出验收：关闭入口→取消/关闭挂起SDK操作→等待回调与工作对象drained→销毁；UI线程无阻塞等待/嵌套事件循环。覆盖关闭过程中回调、worker晚退、销毁重入、手机旧输入清理ACK；连接调用终态、资源drained与业务占用free分开验证。可靠清理未完成不能提前发ACK或交给新owner，disconnect成功以资源drained为条件；超时只通知一次失败，保留Closing owner，后续清理不再补成功、不复用旧对象。QObject保持既有线程归属，不把销毁扔到任意worker。
 
 ### T06 单 JS 下发和执行
 
@@ -87,7 +93,7 @@
 
 依赖 T00–T09。交付 Windows安装/运行产物、正式签名APK、业务及Peerloom服务部署包、默认TURN部署说明、自建TURN配置说明、版本清单及回滚说明。macOS/Linux编译通过。
 
-构建参考：AutoX仓库 `./gradlew :quickmirror:assembleDebug` 用于开发验证，正式任务按项目已有签名配置；桌面先按原CMake配置生成build目录，再 `cmake --build <build-dir> --config Release`。这些不是对当前环境已执行成功的声明。Peerloom使用锁定提交的构建/CI脚本，新增变更同步其平台门禁。新Go服务提供明确的 `go test ./...`、真实数据库integration测试及Compose smoke入口。
+构建参考：AutoX仓库 `./gradlew :quickmirror:assembleDebug` 用于开发验证，正式任务按项目已有签名配置；桌面先按原CMake配置生成build目录，再 `cmake --build <build-dir> --config Release`。这些不是对当前环境已执行成功的声明。产品消费Peerloom锁定正式发行包及校验和，不初始化候选源码作为构建依赖；通用库若确需修改，独立发布并同步平台门禁后再更新产品依赖。新Go服务提供明确的 `go test ./...`、真实数据库integration测试及Compose smoke入口。
 
 完成标准：版本兼容校验有效、Peerloom 安装身份与会话校验无mock、正式密钥不在仓库、更新不重置UUID、服务重启恢复目录与租约事实、可回滚；发布说明如实列出运行验证平台与未完成的真实规模档位。
 
