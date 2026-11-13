@@ -1,6 +1,6 @@
 # QuickMirror 无 ADB 业务服务
 
-设备目录和连接业务服务；Peerloom 仅通过公开 API 和已发布库接入，不将临时源码子模块编入产品。
+设备目录和连接业务服务；Peerloom 仅通过公开 API 和已发布库接入，本仓库不再包含客户端或 Peerloom 源码子模块。
 
 ## 当前实现
 
@@ -26,8 +26,8 @@ go vet ./...
 go build ./...
 ```
 
-测试覆盖真实 HTTP 请求及故障处理，并已完成正式Peerloom v0.1.3包与独立业务数据库/HTTPS进程联调；它不是生产部署或真机验收。GitHub workflow 不初始化临时子模块，Windows、Linux、macOS 分别运行上述门禁。
+测试覆盖真实 HTTP 请求及故障处理，并已完成正式Peerloom v0.1.3包与独立业务数据库/HTTPS进程联调；它不是生产部署或真机验收。GitHub workflow 独立构建本服务，Windows、Linux、macOS 分别运行上述门禁。
 
 ## 仓库布局
 
-`internal/identity` 定义服务内部身份边界，`internal/peerloom` 实现公开 HTTP 适配，`internal/catalog` 管理独立业务目录，`internal/bootstrap` 保存注册尝试收据，`docs` 保存产品、架构和模块说明。根目录三个子模块仅为开发源码定位；最终联调验收后按用户要求移除这些链接，不删除远端仓库。
+`internal/identity` 定义服务内部身份边界，`internal/peerloom` 实现公开 HTTP 适配，`internal/catalog` 管理独立业务目录，`internal/bootstrap` 保存注册尝试收据，`docs` 保存产品、架构和模块说明。项目统一入口是 [qm-app](https://github.com/barry-ran/qm-app)，由它固定客户端、Core、安卓端、业务服务及 Peerloom 的版本。本仓库只维护业务服务；不再承担源码聚合职责。历史中的临时子模块链接也已移除，各独立仓库继续保留。
