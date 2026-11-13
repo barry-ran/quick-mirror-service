@@ -121,9 +121,8 @@ func TestReleasedPeerloomCredentialLifecycle(t *testing.T) {
 		t.Fatal("registration adapter configuration failed")
 	}
 	type credential struct {
-		DeviceID   string    `json:"device_id"`
-		Credential string    `json:"device_credential"`
-		ExpiresAt  time.Time `json:"expires_at"`
+		DeviceID   string `json:"device_id"`
+		Credential string `json:"device_credential"`
 	}
 	register := func(role identity.Role, app string) credential {
 		t.Helper()
@@ -136,34 +135,21 @@ func TestReleasedPeerloomCredentialLifecycle(t *testing.T) {
 			t.Fatalf("grant adapter failed: %v", err)
 		}
 		var result credential
-		request("/v1/device-registrations", "", map[string]any{"application_id": app, "platform": "linux", "installation_public_key": "isolated-release-fixture-" + hex.EncodeToString(key[:]), "registration_grant": grant.Grant}, 201, &result)
+		request("/v1/device-registrations", "", map[string]any{"application_id": app, "platform": "linux", "installation_tag": "isolated-release-fixture-" + hex.EncodeToString(key[:]), "registration_grant": grant.Grant}, 201, &result)
 		return result
 	}
 	old := register(identity.PC, pc.ID)
 	phone := register(identity.Mobile, mobile.ID)
-	before, err := adapter.VerifyCredential(ctx, old.Credential)
+	before, err := adapter.Verify(ctx, old.Credential)
 	if err != nil {
 		t.Fatalf("initial adapter failed: %v", err)
 	}
-	if before.Principal.DeviceID != old.DeviceID || before.Principal.Role != identity.PC || !before.ExpiresAt.Equal(old.ExpiresAt) {
-		t.Fatal("initial identity/expiry mismatch")
+	if before.DeviceID != old.DeviceID || before.Role != identity.PC {
+		t.Fatal("initial identity mismatch")
 	}
-	phoneIdentity, err := adapter.VerifyCredential(ctx, phone.Credential)
-	if err != nil || phoneIdentity.Principal.Role != identity.Mobile {
+	phoneIdentity, err := adapter.Verify(ctx, phone.Credential)
+	if err != nil || phoneIdentity.Role != identity.Mobile {
 		t.Fatal("mobile application mapping failed")
-	}
-	var fresh credential
-	request("/v1/device-credentials/refresh", old.Credential, map[string]any{}, 200, &fresh)
-	overlap, err := adapter.VerifyCredential(ctx, old.Credential)
-	if err != nil {
-		t.Fatalf("overlap credential failed: %v", err)
-	}
-	renewed, err := adapter.VerifyCredential(ctx, fresh.Credential)
-	if err != nil {
-		t.Fatalf("refreshed credential failed: %v", err)
-	}
-	if before.Principal != overlap.Principal || before.Principal != renewed.Principal || !overlap.ExpiresAt.Before(before.ExpiresAt) || !overlap.ExpiresAt.Before(renewed.ExpiresAt) || !renewed.ExpiresAt.Equal(fresh.ExpiresAt) {
-		t.Fatal("credential-specific refresh overlap mismatch")
 	}
 	foreign := cfg
 	foreign.TenantID = "11111111-1111-4111-8111-111111111111"
@@ -174,18 +160,18 @@ func TestReleasedPeerloomCredentialLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result, err := foreignAdapter.VerifyCredential(ctx, fresh.Credential); !errors.Is(err, identity.ErrForbidden) || result.Principal != (identity.Principal{}) {
+	if result, err := foreignAdapter.Verify(ctx, old.Credential); !errors.Is(err, identity.ErrForbidden) || result != (identity.Principal{}) {
 		t.Fatal("cross-tenant adapter accepted credential")
 	}
 	request("/v1/devices/"+old.DeviceID+"/revoke", serviceKey, nil, 200, nil)
-	for _, token := range []string{old.Credential, fresh.Credential} {
-		result, err := adapter.VerifyCredential(ctx, token)
-		if !errors.Is(err, identity.ErrInvalidCredential) || result.Principal != (identity.Principal{}) || !result.ExpiresAt.IsZero() {
+	for _, token := range []string{old.Credential} {
+		result, err := adapter.Verify(ctx, token)
+		if !errors.Is(err, identity.ErrInvalidCredential) || result != (identity.Principal{}) {
 			t.Fatal("revoked credential accepted or identity leaked")
 		}
 	}
-	if _, err := adapter.VerifyCredential(ctx, phone.Credential); err != nil {
+	if _, err := adapter.Verify(ctx, phone.Credential); err != nil {
 		t.Fatal("PC revocation affected unrelated mobile credential")
 	}
-	t.Log("released public HTTP: two roles, grant registration, exact expiry, refresh overlap, tenant isolation and revocation passed")
+	t.Log("released public HTTP: two roles, grant registration, persistent credential, tenant isolation and revocation passed")
 }

@@ -14,7 +14,7 @@ import (
 
 type controlAccess struct{}
 
-func (controlAccess) VerifyAccess(_ context.Context, token string) (identity.Principal, error) {
+func (controlAccess) Verify(_ context.Context, token string) (identity.Principal, error) {
 	if token != "test" {
 		return identity.Principal{}, identity.ErrInvalidCredential
 	}

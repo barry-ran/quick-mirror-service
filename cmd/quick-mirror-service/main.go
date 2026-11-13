@@ -3,22 +3,19 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"encoding/base64"
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
-	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
-	"github.com/barry-ran/quick-mirror-service/internal/access"
+	"github.com/barry-ran/quick-mirror-service/internal/binding"
 	"github.com/barry-ran/quick-mirror-service/internal/bootstrap"
 	"github.com/barry-ran/quick-mirror-service/internal/catalog"
 	"github.com/barry-ran/quick-mirror-service/internal/control"
@@ -34,7 +31,6 @@ type config struct {
 	Address           string
 	CertificateFile   string
 	KeyFile           string
-	AccessKey         []byte
 	ControlGrantTTL   int
 	APIConcurrency    int
 	upstreamClient    *http.Client // 测试注入受信CA；生产始终使用系统信任与严格HTTPS。
@@ -72,10 +68,6 @@ func loadConfig() (config, error) {
 	if err != nil || c.ControlGrantTTL > 30*24*3600 {
 		return c, errors.New("INVALID_CONTROL_GRANT_TTL")
 	}
-	c.AccessKey, err = readAccessKey(os.Getenv("QM_ACCESS_KEY_FILE"))
-	if err != nil {
-		return c, err
-	}
 	if c.Database == "" || c.CertificateFile == "" || c.KeyFile == "" {
 		return c, errors.New("DATABASE_AND_TLS_CONFIGURATION_REQUIRED")
 	}
@@ -87,34 +79,6 @@ func loadConfig() (config, error) {
 		return c, errors.New("INVALID_SERVICE_CONFIGURATION")
 	}
 	return c, nil
-}
-
-// 只读取运维提供的独立密钥；不自动生成/覆盖，不把内容放进错误或日志。
-func readAccessKey(path string) ([]byte, error) {
-	invalid := errors.New("ACCESS_KEY_FILE_REQUIRED")
-	before, err := os.Lstat(path)
-	if err != nil || !before.Mode().IsRegular() || (runtime.GOOS != "windows" && before.Mode().Perm()&0077 != 0) {
-		return nil, invalid
-	}
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, invalid
-	}
-	defer file.Close()
-	current, err := file.Stat()
-	if err != nil || !os.SameFile(before, current) {
-		return nil, invalid
-	}
-	data, err := io.ReadAll(io.LimitReader(file, 65))
-	if err != nil || len(data) > 64 {
-		return nil, invalid
-	}
-	text := strings.TrimSuffix(strings.TrimSuffix(string(data), "\n"), "\r")
-	key, err := base64.StdEncoding.Strict().DecodeString(text)
-	if err != nil || len(key) != 32 || base64.StdEncoding.EncodeToString(key) != text {
-		return nil, invalid
-	}
-	return key, nil
 }
 
 func positiveInt(name string, fallback int) (int, error) {
@@ -175,9 +139,9 @@ func serve(ctx context.Context, c config, migrate bool) error {
 	if err != nil {
 		return errors.New("INVALID_PEERLOOM_CONFIGURATION")
 	}
-	tokens, err := access.NewStore(pool, c.HTTP.ServiceScope, c.HTTP.Identity.TenantID, c.AccessKey, verifier)
+	bindings, err := binding.NewStore(pool, c.HTTP.ServiceScope, c.HTTP.Identity.TenantID)
 	if err != nil {
-		return errors.New("INVALID_SERVICE_CONFIGURATION")
+		return errors.New("INVALID_BINDING_CONFIGURATION")
 	}
 	grantTTL := c.ControlGrantTTL
 	if grantTTL == 0 {
@@ -191,17 +155,18 @@ func serve(ctx context.Context, c config, migrate bool) error {
 	if err != nil {
 		return errors.New("INVALID_CONTROL_CONFIGURATION")
 	}
+	intents.SetBindings(bindings)
 	if migrate {
 		migration, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
-		if directory.Migrate(migration) != nil || store.Migrate(migration) != nil || tokens.Migrate(migration) != nil || intents.Migrate(migration) != nil {
+		if bindings.Migrate(migration) != nil || directory.Migrate(migration) != nil || store.Migrate(migration) != nil || intents.Migrate(migration) != nil {
 			return errors.New("MIGRATION_FAILED")
 		}
 		return nil
 	}
 	var schemaReady bool
 	check, cancel = context.WithTimeout(ctx, 5*time.Second)
-	err = pool.QueryRow(check, `SELECT to_regclass('qm_bootstrap_intents') IS NOT NULL AND to_regclass('qm_access_tokens') IS NOT NULL AND to_regclass('qm_access_key_usage') IS NOT NULL AND to_regclass('qm_device_catalog') IS NOT NULL AND to_regclass('qm_device_boots') IS NOT NULL AND to_regclass('qm_control_intents') IS NOT NULL AND to_regclass('qm_control_slots') IS NOT NULL AND to_regclass('qm_control_commands') IS NOT NULL`).Scan(&schemaReady)
+	err = pool.QueryRow(check, `SELECT to_regclass('qm_access_tokens') IS NULL AND to_regclass('qm_access_key_usage') IS NULL AND to_regclass('qm_bindings') IS NOT NULL AND to_regclass('qm_installations') IS NOT NULL AND to_regclass('qm_binding_codes') IS NOT NULL AND to_regclass('qm_binding_receipts') IS NOT NULL AND to_regclass('qm_binding_close_tasks') IS NOT NULL AND to_regclass('qm_bootstrap_intents') IS NOT NULL AND to_regclass('qm_device_catalog') IS NOT NULL AND to_regclass('qm_device_boots') IS NOT NULL AND to_regclass('qm_control_intents') IS NOT NULL AND to_regclass('qm_control_slots') IS NOT NULL AND to_regclass('qm_control_commands') IS NOT NULL`).Scan(&schemaReady)
 	cancel()
 	if err != nil || !schemaReady {
 		return errors.New("MIGRATION_REQUIRED")
@@ -214,15 +179,15 @@ func serve(ctx context.Context, c config, migrate bool) error {
 	if err != nil {
 		return errors.New("INVALID_SERVICE_CONFIGURATION")
 	}
-	exchange, err := httpapi.NewExchangeHandler(tokens, directory, c.APIConcurrency)
+	relations, err := httpapi.NewBindingHandler(verifier, bindings, directory, transport, c.HTTP.ServiceScope, c.APIConcurrency)
+	if err != nil {
+		return errors.New("INVALID_BINDING_CONFIGURATION")
+	}
+	devices, err := httpapi.NewCatalogHandler(verifier, directory, c.APIConcurrency)
 	if err != nil {
 		return errors.New("INVALID_SERVICE_CONFIGURATION")
 	}
-	devices, err := httpapi.NewCatalogHandler(tokens, directory, c.APIConcurrency)
-	if err != nil {
-		return errors.New("INVALID_SERVICE_CONFIGURATION")
-	}
-	controls, err := httpapi.NewControlHandler(tokens, intents, c.APIConcurrency)
+	controls, err := httpapi.NewControlHandler(verifier, intents, c.APIConcurrency)
 	if err != nil {
 		return errors.New("INVALID_CONTROL_CONFIGURATION")
 	}
@@ -231,10 +196,12 @@ func serve(ctx context.Context, c config, migrate bool) error {
 			controls.ServeHTTP(w, r)
 			return
 		}
+		if strings.HasPrefix(r.URL.Path, "/qm/v1/bindings") || strings.HasPrefix(r.URL.Path, "/qm/v1/binding-code/") || r.URL.Path == "/qm/v1/installations/self/ensure" {
+			relations.ServeHTTP(w, r)
+			return
+		}
 		switch r.URL.Path {
-		case "/qm/v1/auth/pc/exchange", "/qm/v1/auth/device/exchange":
-			exchange.ServeHTTP(w, r)
-		case "/qm/v1/devices/resolve", "/qm/v1/device-self/status":
+		case "/qm/v1/device-self/status":
 			devices.ServeHTTP(w, r)
 		default:
 			handler.ServeHTTP(w, r)
@@ -265,9 +232,6 @@ func serve(ctx context.Context, c config, migrate bool) error {
 			case <-ticker.C:
 				cleanup, cancel := context.WithTimeout(maintenance, 5*time.Second)
 				err := store.PurgeExpired(cleanup)
-				if err == nil {
-					err = tokens.PurgeExpired(cleanup)
-				}
 				cancel()
 				if err != nil && maintenance.Err() == nil {
 					fmt.Fprintln(os.Stderr, "SERVICE_EXPIRED_RECORD_CLEANUP_FAILED")

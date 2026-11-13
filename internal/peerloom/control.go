@@ -44,11 +44,12 @@ type ControlSession struct {
 	TargetLeaseExpiresAt time.Time `json:"target_lease_expires_at"`
 }
 type ControlDevice struct {
-	ID            string `json:"id"`
-	TenantID      string `json:"tenant_id"`
-	ApplicationID string `json:"application_id"`
-	Status        string `json:"status"`
-	Online        *bool  `json:"online"`
+	Metadata      map[string]any `json:"metadata"`
+	ID            string         `json:"id"`
+	TenantID      string         `json:"tenant_id"`
+	ApplicationID string         `json:"application_id"`
+	Status        string         `json:"status"`
+	Online        *bool          `json:"online"`
 }
 
 func NewControlClient(c IdentityConfig, credential string, client *http.Client) (*ControlClient, error) {

@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/barry-ran/quick-mirror-service/internal/binding"
 	"github.com/barry-ran/quick-mirror-service/internal/catalog"
 	"github.com/barry-ran/quick-mirror-service/internal/identity"
 	"github.com/barry-ran/quick-mirror-service/internal/peerloom"
@@ -145,6 +146,25 @@ func TestReleasedSDKControlAdmissionAndDrain(t *testing.T) {
 	}
 	owner := identity.Principal{DeviceID: peers.PC, TenantID: tenantID, ApplicationID: peers.PCApp, Role: identity.PC}
 	phone := identity.Principal{DeviceID: peers.Phone, TenantID: tenantID, ApplicationID: peers.PhoneApp, Role: identity.Mobile}
+	bindings, e := binding.NewStore(pool, scopeID, tenantID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = bindings.Migrate(ctx); e != nil {
+		t.Fatal(e)
+	}
+	code, e := bindings.Ensure(ctx, phone)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = bindings.Ensure(ctx, owner); e != nil {
+		t.Fatal(e)
+	}
+	relationKey, _ := uuid()
+	if _, e = bindings.Bind(ctx, owner, code.Code, relationKey); e != nil {
+		t.Fatal(e)
+	}
+	store.SetBindings(bindings)
 	boot, e := uuid()
 	if e != nil {
 		t.Fatal(e)
@@ -250,7 +270,7 @@ try:
   status=lib.dp_sdk_create(buf,len(raw),callback,who,C.byref(sdk))
   if status:raise RuntimeError('SDK create '+str(status))
   sdks.append(sdk.value)
-  dev=submit(sdk.value,who,1,{'registration':{'platform':'linux','installation_public_key':'fixture-'+str(uuid.uuid4()),'registration_grant':grant['grant'],'sdk_version':'release-fixture','metadata':{}},'idempotency_key':str(uuid.uuid4())})
+  dev=submit(sdk.value,who,1,{'registration':{'platform':'linux','installation_tag':'fixture-'+str(uuid.uuid4()),'registration_grant':grant['grant'],'sdk_version':'release-fixture','metadata':{}},'idempotency_key':str(uuid.uuid4())})
   wait(lambda e:e[0]==who and e[1]==2)
   info[label+'_device']=dev['device_id'];info[label+'_app']=app['id']
  print(json.dumps(info),flush=True)

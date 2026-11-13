@@ -7,8 +7,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
-	"fmt"
 	"github.com/barry-ran/quick-mirror-service/internal/catalog"
 	"github.com/barry-ran/quick-mirror-service/internal/identity"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -138,57 +136,8 @@ func TestCatalogHTTPRealDatabaseAndTLS(t *testing.T) {
 	if code, _ := request("PUT", "/qm/v1/device-self/status", "pc_fixture", status); code != 403 {
 		t.Fatal("PC wrote mobile status", code)
 	}
-	ids := make([]string, 501)
-	for i := range ids {
-		ids[i] = fmt.Sprintf("66666666-6666-4666-8666-%012d", i)
-		p := device
-		p.DeviceID = ids[i]
-		if err := directory.Register(ctx, p, "test"); err != nil {
-			t.Fatal(err)
-		}
-	}
-	total := 0
-	for start := 0; start < len(ids); start += 200 {
-		end := start + 200
-		if end > len(ids) {
-			end = len(ids)
-		}
-		body, _ := json.Marshal(map[string]any{"uuids": ids[start:end]})
-		code, data := request("POST", "/qm/v1/devices/resolve", "pc_fixture", body)
-		if code != 200 {
-			t.Fatal("resolve", code)
-		}
-		var result struct {
-			Data struct {
-				Items []struct {
-					Found bool `json:"found"`
-				} `json:"items"`
-			} `json:"data"`
-		}
-		if json.Unmarshal(data, &result) != nil || len(result.Data.Items) != end-start {
-			t.Fatal("batch truncated")
-		}
-		for _, item := range result.Data.Items {
-			if !item.Found {
-				t.Fatal("registered offline record hidden")
-			}
-			total++
-		}
-	}
-	if total != 501 {
-		t.Fatal("device count capped")
-	}
-	body, _ := json.Marshal(map[string]any{"uuids": ids[:201]})
-	if code, _ := request("POST", "/qm/v1/devices/resolve", "pc_fixture", body); code != 400 {
-		t.Fatal("oversize batch accepted", code)
-	}
-	body, _ = json.Marshal(map[string]any{"uuids": []string{mobile}})
-	code, data := request("POST", "/qm/v1/devices/resolve", "pc_fixture", body)
-	if code != 200 || strings.Contains(string(data), "projection") || strings.Contains(string(data), "online") {
-		t.Fatal("permission snapshot represented availability")
-	}
-	if code, _ := request("POST", "/qm/v1/devices/resolve", "foreign_fixture", body); code != 403 {
-		t.Fatal("foreign tenant allowed", code)
+	if code, _ := request("POST", "/qm/v1/devices/resolve", "pc_fixture", []byte(`{"uuids":[]}`)); code != 404 {
+		t.Fatal("legacy route exposed")
 	}
 	records, err := directory.ResolveBatch(ctx, pcPrincipal, []string{mobile})
 	if err != nil || len(records) != 1 || records[0].Device == nil || !records[0].Device.Permissions.Projection {

@@ -1,33 +1,27 @@
-# QuickMirror 无 ADB 业务服务
+# QuickMirror app 模式业务服务
 
-设备目录和连接业务服务；Peerloom 仅通过公开 API 和已发布库接入，本仓库不再包含客户端或 Peerloom 源码子模块。
+通用传输由 Peerloom 提供，本仓负责安装认证、持久设备绑定、能力目录与控制意图。项目聚合入口为 [qm-app](https://github.com/barry-ran/qm-app)，本仓不含客户端或 Peerloom 源码子模块。
 
-## 当前实现
+## 当前架构
 
-- 安装身份模型与 UUID 规范化。
-- Peerloom `GET /v1/device-self` HTTP 适配器：HTTPS、超时、禁止重定向、响应体上限、服务域租户校验、可信 application 到 PC/手机角色映射。
-- 原产品账号 token 不参与上述校验；平台和 metadata 不作为角色证据。
-- PostgreSQL 设备目录：安装注册、权限能力快照、boot/seq并发一致性、按服务域分批查询。
-- 业务令牌交换与撤销重验：已挂HTTP，正式Peerloom v0.1.3及独立TLS运行时联调通过；不等于完整客户端/会话/媒体验收。
-- 安装注册 HTTP Handler 与 OpenAPI：严格 JSON、角色绑定、资源预算和稳定错误语义；尚无公开部署。
-- 公开 registration-grants 适配器与 bootstrap 幂等意图存储：并发/重启复用原尝试，冲突、过期、凭证轮换时明确拒绝，不存管理密钥或 grant 明文。
+- 所有受保护请求直接校验 Peerloom 长期安装凭据；租户及 application 映射 PC/手机角色。不签发重复业务 token，也不保存安装秘密。
+- 六位持久绑定码：PC 多手机、手机唯一 PC，双向添加、手机手动刷新、离线保留、批量逐项结果。
+- PostgreSQL 事务保证关系唯一、退休码不复用、操作幂等和解绑关闭 outbox；未知结果不自动重发授权。
+- 在线状态通过 Peerloom 公开 presence 查询，故障返回未知；手机能力快照不是上线证据。
+- 控制意图固定 binding ID/版本，复用原独占槽位、runtime proof、generation 和 drain；解绑不跳过旧资源排空。
 
-- 控制意图、一次grant dispatch、手机runtime登记与绑定/撤销/释放确认；未知结果不重复授权，跨进程恢复及实际两端执行门禁验收需区分，见[控制意图模块](docs/控制意图模块.md)。
+服务端实现、测试与正式发布/客户端联调是不同阶段。当前改造不能据此宣称新 SDK 发布、PC/安卓 UI 或真机投屏控制已全部通过。Core 媒体和 TCP 桥不属于这次身份绑定改造。
 
-提供 TLS-only 服务进程，开放安装注册、身份交换与目录HTTP；它不是完整的群控业务服务器。构建、配置与限制见 [部署指南](docs/部署指南.md) 和 [使用说明](docs/使用说明.md)。实时状态推送、完整两端会话执行门禁、自定义 TURN 和完整群控联调尚未交付；没有以 mock 启动生产服务的路径。开发范围与验收门禁见 [文档入口](docs/README.md)。
-
-## 开发验证
-
-使用 `go.mod` 指定的 Go 版本，遵循官方工程惯例和 `gofmt`：
+## 开发
 
 ```sh
 go test -race ./...
 go vet ./...
 go build ./...
+# 仅配置专用 *_test 数据库后运行
+go test -race -tags integration ./internal/...
 ```
 
-测试覆盖真实 HTTP 请求及故障处理，并已完成正式Peerloom v0.1.3包与独立业务数据库/HTTPS进程联调；它不是生产部署或真机验收。GitHub workflow 独立构建本服务，Windows、Linux、macOS 分别运行上述门禁。
+模块：`identity` 可信主体，`peerloom` 公开 API，`bootstrap` 注册授权，`catalog` 手机快照，`binding` 码和关系，`control` 会话授权及恢复，`httpapi` HTTP 边界。
 
-## 仓库布局
-
-`internal/identity` 定义服务内部身份边界，`internal/peerloom` 实现公开 HTTP 适配，`internal/catalog` 管理独立业务目录，`internal/bootstrap` 保存注册尝试收据，`docs` 保存产品、架构和模块说明。项目统一入口是 [qm-app](https://github.com/barry-ran/qm-app)，由它固定客户端、Core、安卓端、业务服务及 Peerloom 的版本。本仓库只维护业务服务；不再承担源码聚合职责。历史中的临时子模块链接也已移除，各独立仓库继续保留。
+参见 [文档入口](docs/README.md)、[部署](docs/部署指南.md)、[用户流程](docs/使用说明.md)及[绑定 OpenAPI](api/binding.openapi.json)。验证必须对应实际提交，不把旧版本或 mock 结果当新版本端到端证据。

@@ -42,6 +42,8 @@ type Upstream interface {
 	GetDevice(context.Context, string) (peerloom.ControlDevice, error)
 }
 type Intent struct {
+	BindingID                           string `json:"binding_id"`
+	BindingRevision                     string `json:"binding_revision"`
 	ID                                  string `json:"intent_id"`
 	Target                              string `json:"device_uuid"`
 	Owner                               string `json:"owner_pc_uuid"`
@@ -62,6 +64,7 @@ type Store struct {
 	pool                     *pgxpool.Pool
 	scope, tenant, mobileApp string
 	upstream                 Upstream
+	bindings                 BindingAuthority
 }
 
 func NewStore(pool *pgxpool.Pool, scope, tenant, mobileApp string, u Upstream) (*Store, error) {
@@ -71,7 +74,7 @@ func NewStore(pool *pgxpool.Pool, scope, tenant, mobileApp string, u Upstream) (
 	if pool == nil || !a || !b || !c || u == nil || u.ReplayDomain() == "" {
 		return nil, fail("INVALID_CONFIGURATION", 500)
 	}
-	return &Store{pool, scope, tenant, mobileApp, u}, nil
+	return &Store{pool: pool, scope: scope, tenant: tenant, mobileApp: mobileApp, upstream: u}, nil
 }
 func (s *Store) Migrate(ctx context.Context) error { _, e := s.pool.Exec(ctx, migration); return e }
 func uuid() (string, error) {
@@ -117,13 +120,13 @@ func (s *Store) begin(ctx context.Context) (pgx.Tx, error) {
 
 const columns = `id::text,target_uuid::text,owner_uuid::text,generation::text,revision::text,state,outcome,
 COALESCE(session_id::text,''),COALESCE(drain_token::text,''),COALESCE(close_reason,''),COALESCE(grant_id::text,''),create_key::text,revoke_key::text,replay_domain,dispatched,revoked,
-COALESCE(terminal_at+interval '24 hours'<=clock_timestamp(),false),runtime_boot::text,runtime_hash`
+COALESCE(terminal_at+interval '24 hours'<=clock_timestamp(),false),runtime_boot::text,runtime_hash,COALESCE(binding_id::text,''),COALESCE(binding_revision::text,'')`
 
 type scanner interface{ Scan(...any) error }
 
 func scan(row scanner) (Intent, error) {
 	var i Intent
-	e := row.Scan(&i.ID, &i.Target, &i.Owner, &i.Generation, &i.Revision, &i.State, &i.Outcome, &i.Session, &i.DrainToken, &i.CloseReason, &i.grant, &i.createKey, &i.revokeKey, &i.domain, &i.dispatched, &i.revoked, &i.expired, &i.runtimeBoot, &i.runtimeHash)
+	e := row.Scan(&i.ID, &i.Target, &i.Owner, &i.Generation, &i.Revision, &i.State, &i.Outcome, &i.Session, &i.DrainToken, &i.CloseReason, &i.grant, &i.createKey, &i.revokeKey, &i.domain, &i.dispatched, &i.revoked, &i.expired, &i.runtimeBoot, &i.runtimeHash, &i.BindingID, &i.BindingRevision)
 	return i, e
 }
 func (s *Store) load(ctx context.Context, tx pgx.Tx, id string) (Intent, error) {
@@ -159,6 +162,19 @@ func (s *Store) replay(ctx context.Context, tx pgx.Tx, p identity.Principal, op,
 	i, e := s.load(ctx, tx, id)
 	if e == nil && i.expired {
 		e = errUnknown
+	}
+	// Every command replay is a fresh authorization read. A new relation for the
+	// same devices cannot revive the old intent's immutable binding version.
+	if e == nil && (i.State == "reserving" || i.State == "active") {
+		valid, err := s.bindingValid(ctx, tx, i)
+		if err != nil {
+			return Intent{}, true, err
+		}
+		if !valid {
+			i.State = "draining"
+			i.CloseReason = "unbound"
+			i.DrainToken = ""
+		}
 	}
 	return i, true, e
 }
@@ -205,6 +221,16 @@ func (s *Store) Get(ctx context.Context, p identity.Principal, id string) (Inten
 	if i.expired {
 		return Intent{}, errUnknown
 	}
+	if i.State == "reserving" || i.State == "active" {
+		valid, err := s.bindingValid(ctx, tx, i)
+		if err != nil {
+			return Intent{}, err
+		}
+		if !valid {
+			i.State = "draining"
+			i.CloseReason = "unbound"
+		}
+	}
 	return visible(i, p), nil
 }
 func (s *Store) Current(ctx context.Context, p identity.Principal) (*Intent, error) {
@@ -229,6 +255,17 @@ func (s *Store) Current(ctx context.Context, p identity.Principal) (*Intent, err
 		return nil, e
 	}
 	i, e := s.load(ctx, tx, id)
+	if e == nil && (i.State == "reserving" || i.State == "active") {
+		valid, err := s.bindingValid(ctx, tx, i)
+		if err != nil {
+			return nil, err
+		}
+		if !valid {
+			i.State = "draining"
+			i.CloseReason = "unbound"
+			i.DrainToken = ""
+		}
+	}
 	return &i, e
 }
 func (s *Store) ByCommand(ctx context.Context, p identity.Principal, key string) (Intent, error) {
@@ -260,6 +297,16 @@ func (s *Store) ByCommand(ctx context.Context, p identity.Principal, key string)
 	if e == nil && i.expired {
 		e = errUnknown
 	}
+	if e == nil && (i.State == "reserving" || i.State == "active") {
+		valid, err := s.bindingValid(ctx, tx, i)
+		if err != nil {
+			return Intent{}, err
+		}
+		if !valid {
+			i.State = "draining"
+			i.CloseReason = "unbound"
+		}
+	}
 	return visible(i, p), e
 }
 func (s *Store) Create(ctx context.Context, p identity.Principal, target, key string) (Intent, bool, error) {
@@ -283,6 +330,11 @@ func (s *Store) Create(ctx context.Context, p identity.Principal, target, key st
 	tx, e := s.begin(ctx)
 	if e != nil {
 		return Intent{}, false, e
+	}
+	_, bindingErr := s.activeBinding(ctx, tx, p.DeviceID, target)
+	if bindingErr != nil {
+		tx.Rollback(ctx)
+		return Intent{}, false, bindingErr
 	}
 	old, found, e := s.replay(ctx, tx, p, "create", key, body)
 	tx.Rollback(ctx)
@@ -313,6 +365,10 @@ func (s *Store) Create(ctx context.Context, p identity.Principal, target, key st
 	old, found, e = s.replay(ctx, tx, p, "create", key, body)
 	if found || e != nil {
 		return visible(old, p), false, e
+	}
+	binding, e := s.activeBinding(ctx, tx, p.DeviceID, target)
+	if e != nil {
+		return Intent{}, false, e
 	}
 	_, e = tx.Exec(ctx, `INSERT INTO qm_control_slots(service_scope,target_uuid)VALUES($1,$2)ON CONFLICT DO NOTHING`, s.scope, target)
 	if e != nil {
@@ -354,7 +410,7 @@ func (s *Store) Create(ctx context.Context, p identity.Principal, target, key st
 	if e != nil {
 		return Intent{}, false, e
 	}
-	_, e = tx.Exec(ctx, `INSERT INTO qm_control_intents(service_scope,id,target_uuid,owner_uuid,generation,state,outcome,create_key,revoke_key,replay_domain,runtime_boot,runtime_hash)VALUES($1,$2,$3,$4,$5,'reserving','pending',$6,$7,$8,$9,$10)`, s.scope, id, target, p.DeviceID, generation+1, createKey, revokeKey, s.upstream.ReplayDomain(), boot, proofHash)
+	_, e = tx.Exec(ctx, `INSERT INTO qm_control_intents(service_scope,id,target_uuid,owner_uuid,generation,state,outcome,create_key,revoke_key,replay_domain,runtime_boot,runtime_hash,binding_id,binding_revision)VALUES($1,$2,$3,$4,$5,'reserving','pending',$6,$7,$8,$9,$10,$11,$12)`, s.scope, id, target, p.DeviceID, generation+1, createKey, revokeKey, s.upstream.ReplayDomain(), boot, proofHash, binding.ID, binding.Revision)
 	if e != nil {
 		return Intent{}, false, e
 	}
@@ -387,6 +443,16 @@ func (s *Store) dispatch(ctx context.Context, id string) error {
 	}
 	if i.dispatched || i.State != "reserving" || i.Outcome == "unknown" {
 		return nil
+	}
+	valid, e := s.bindingValid(ctx, tx, i)
+	if e != nil {
+		return e
+	}
+	if !valid {
+		if e = s.finish(ctx, tx, id, "failed"); e != nil {
+			return e
+		}
+		return tx.Commit(ctx)
 	}
 	if e = bump(i); e != nil {
 		return e
@@ -435,6 +501,15 @@ func (s *Store) dispatch(ctx context.Context, id string) error {
 	}
 	if e = bump(i); e != nil {
 		return e
+	}
+	valid, e = s.bindingValid(ctx, tx, i)
+	if e != nil {
+		return e
+	}
+	if !valid && i.State != "draining" {
+		if _, e = tx.Exec(ctx, `UPDATE qm_control_intents SET state='draining',close_reason='unbound' WHERE service_scope=$1 AND id=$2`, s.scope, id); e != nil {
+			return e
+		}
 	}
 	_, e = tx.Exec(ctx, `UPDATE qm_control_intents SET grant_id=$3,outcome='confirmed',revision=revision+1 WHERE service_scope=$1 AND id=$2`, s.scope, id, g.ID)
 	if e != nil {
@@ -582,6 +657,13 @@ func (s *Store) Bind(ctx context.Context, p identity.Principal, id, key, gen, se
 	}
 	if !allowed(i, p) {
 		return Intent{}, fail("INTENT_NOT_FOUND", 404)
+	}
+	validBinding, e := s.bindingValid(ctx, tx, i)
+	if e != nil {
+		return Intent{}, e
+	}
+	if !validBinding {
+		return Intent{}, fail("BINDING_CHANGED", 409)
 	}
 	if e = s.runtime(ctx, tx, i, boot, proof); e != nil {
 		return Intent{}, e
@@ -757,6 +839,9 @@ func (s *Store) progressDrain(ctx context.Context, id string) error {
 // Recover never re-dispatches an attempt already marked dispatched. Unknown grants remain occupied.
 // Work is keyset-paged, bounded per pass; the cursor is returned to avoid starving later targets.
 func (s *Store) Recover(ctx context.Context, after string) (string, error) {
+	if err := s.completeBindingClosures(ctx); err != nil {
+		return after, err
+	}
 	if after == "" {
 		after = "00000000-0000-0000-0000-000000000000"
 	}
@@ -783,7 +868,7 @@ func (s *Store) Recover(ctx context.Context, after string) (string, error) {
 	}
 	var failures []error
 	for _, id := range ids {
-		for _, step := range []func(context.Context, string) error{s.checkRuntime, s.dispatch, s.progressDrain} {
+		for _, step := range []func(context.Context, string) error{s.checkBinding, s.checkRuntime, s.dispatch, s.progressDrain} {
 			e = step(ctx, id)
 			if e == nil {
 				continue

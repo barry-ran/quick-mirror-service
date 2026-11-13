@@ -50,7 +50,7 @@ func (s *Store) mobile(principal identity.Principal) (string, string, error) {
 	return id, application, nil
 }
 
-// EnsureRegistration 用于身份交换后的幂等建档；重交换不能清空已有版本、boot或权限快照。
+// EnsureRegistration 用于安装初始化的幂等建档；重复初始化不能清空已有版本、boot或权限快照。
 // 它只接受可信手机主体，不从请求正文获取 device/application UUID。
 func (s *Store) EnsureRegistration(ctx context.Context, principal identity.Principal) error {
 	id, application, err := s.mobile(principal)

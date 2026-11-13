@@ -18,7 +18,7 @@ const (
 var (
 	ErrInvalidCredential = errors.New("AUTH_INVALID")
 	ErrForbidden         = errors.New("INSTALLATION_FORBIDDEN")
-	ErrUnavailable       = errors.New("SERVICE_UNAVAILABLE")
+	ErrUnavailable       = errors.New("UPSTREAM_UNAVAILABLE")
 	uuidPattern          = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 )
 

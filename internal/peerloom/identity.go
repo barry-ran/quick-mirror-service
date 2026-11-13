@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/barry-ran/quick-mirror-service/internal/access"
 	"github.com/barry-ran/quick-mirror-service/internal/identity"
 )
 
@@ -60,32 +59,11 @@ func NewIdentityClient(config IdentityConfig, client *http.Client) (*IdentityCli
 
 type identityResponse struct {
 	Principal identity.Principal
-	Expiry    json.RawMessage
 }
 
 func (c *IdentityClient) Verify(ctx context.Context, credential string) (identity.Principal, error) {
 	result, err := c.fetchIdentity(ctx, credential)
 	return result.Principal, err
-}
-
-// VerifyCredential 适配公开可信期限字段；缺字段时失败关闭，不猜测客户端期限。
-// 已通过正式v0.1.3公开接口实际联调；缺少可信字段仍失败关闭。
-func (c *IdentityClient) VerifyCredential(ctx context.Context, credential string) (access.VerifiedCredential, error) {
-	var empty access.VerifiedCredential
-	result, err := c.fetchIdentity(ctx, credential)
-	if err != nil {
-		return empty, err
-	}
-	var value string
-	if len(result.Expiry) == 0 || json.Unmarshal(result.Expiry, &value) != nil || value == "" {
-		return empty, identity.ErrUnavailable
-	}
-	expiry, err := time.Parse(time.RFC3339Nano, value)
-	if err != nil || expiry.IsZero() {
-		return empty, identity.ErrUnavailable
-	}
-	// 与数据库时钟比较及15分钟上界在 access.Store 内执行，避免宿主时钟代替权威时钟。
-	return access.VerifiedCredential{Principal: result.Principal, ExpiresAt: expiry.UTC()}, nil
 }
 
 func (c *IdentityClient) fetchIdentity(ctx context.Context, credential string) (identityResponse, error) {
@@ -119,10 +97,9 @@ func (c *IdentityClient) fetchIdentity(ctx context.Context, credential string) (
 		return empty, identity.ErrUnavailable
 	}
 	var device struct {
-		DeviceID            string          `json:"device_id"`
-		ApplicationID       string          `json:"application_id"`
-		TenantID            string          `json:"tenant_id"`
-		CredentialExpiresAt json.RawMessage `json:"credential_expires_at"`
+		DeviceID      string `json:"device_id"`
+		ApplicationID string `json:"application_id"`
+		TenantID      string `json:"tenant_id"`
 	}
 	if err := json.Unmarshal(data, &device); err != nil {
 		return empty, identity.ErrUnavailable
@@ -145,5 +122,5 @@ func (c *IdentityClient) fetchIdentity(ctx context.Context, credential string) (
 	default:
 		return empty, identity.ErrForbidden
 	}
-	return identityResponse{Principal: identity.Principal{DeviceID: id, TenantID: tenant, ApplicationID: application, Role: role}, Expiry: device.CredentialExpiresAt}, nil
+	return identityResponse{Principal: identity.Principal{DeviceID: id, TenantID: tenant, ApplicationID: application, Role: role}}, nil
 }

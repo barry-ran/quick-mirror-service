@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"github.com/barry-ran/quick-mirror-service/internal/binding"
 	"github.com/barry-ran/quick-mirror-service/internal/catalog"
 	"os"
 	"strings"
@@ -41,6 +42,7 @@ type fakeUpstream struct {
 	grant       peerloom.ControlGrant
 	session     peerloom.ControlSession
 	afterCreate func()
+	afterDevice func()
 }
 
 func (f *fakeUpstream) ReplayDomain() string { return f.domain }
@@ -69,6 +71,9 @@ func (f *fakeUpstream) GetSession(context.Context, string) (peerloom.ControlSess
 	return f.session, nil
 }
 func (f *fakeUpstream) GetDevice(context.Context, string) (peerloom.ControlDevice, error) {
+	if f.afterDevice != nil {
+		f.afterDevice()
+	}
 	if f.deviceError != nil {
 		return peerloom.ControlDevice{}, f.deviceError
 	}
@@ -128,6 +133,25 @@ func testStore(t *testing.T, f *fakeUpstream) *Store {
 		t.Fatal(e)
 	}
 	mobile := identity.Principal{DeviceID: phone, TenantID: tenant, ApplicationID: mobileApp, Role: identity.Mobile}
+	bindings, e := binding.NewStore(pool, scope, tenant)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = bindings.Migrate(ctx); e != nil {
+		t.Fatal(e)
+	}
+	code, e := bindings.Ensure(ctx, mobile)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = bindings.Ensure(ctx, owner); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = bindings.Bind(ctx, owner, code.Code, "99999999-9999-4999-8999-999999999999"); e != nil {
+		t.Fatal(e)
+	}
+	s.SetBindings(bindings)
+
 	if e = directory.EnsureRegistration(ctx, mobile); e != nil {
 		t.Fatal(e)
 	}
@@ -144,7 +168,7 @@ func command(t *testing.T) string {
 	}
 	return v
 }
-func TestConcurrentOwnersAndReplay(t *testing.T) {
+func TestConcurrentCommandsAndReplay(t *testing.T) {
 	ctx := context.Background()
 	f := &fakeUpstream{domain: "a"}
 	s := testStore(t, f)
@@ -153,7 +177,6 @@ func TestConcurrentOwnersAndReplay(t *testing.T) {
 	wins := 0
 	for n := 0; n < 20; n++ {
 		p := owner
-		p.DeviceID = command(t)
 		key := command(t)
 		wg.Add(1)
 		go func() {
@@ -194,6 +217,7 @@ func TestUnknownCreateNeverRedispatchedAfterRestartOrDomainChange(t *testing.T) 
 	if e != nil {
 		t.Fatal(e)
 	}
+	restarted.SetBindings(s.bindings)
 	again, new, e := restarted.Create(ctx, owner, phone, key)
 	if e != nil || new || again.ID != i.ID || f.calls != 1 {
 		t.Fatalf("replayed: %+v %v calls=%d", again, e, f.calls)
@@ -592,5 +616,198 @@ func TestCreateMissingDeviceIsNotTransient(t *testing.T) {
 	var count int
 	if err = s.pool.QueryRow(context.Background(), `SELECT count(*) FROM qm_control_intents`).Scan(&count); err != nil || count != 0 || f.calls != 0 {
 		t.Fatalf("must not reserve/create grant: count=%d calls=%d err=%v", count, f.calls, err)
+	}
+}
+
+// Grant网络调用期间解绑必须拒绝交付旧关系授权，且未知撤销保持占用。
+func TestUnbindDuringGrantAndRestartDrain(t *testing.T) {
+	ctx := context.Background()
+	f := &fakeUpstream{domain: "binding-race"}
+	s := testStore(t, f)
+	bindings := s.bindings.(*binding.Store)
+	page, e := bindings.List(ctx, owner, "", 10)
+	if e != nil || len(page.Items) != 1 {
+		t.Fatal(e)
+	}
+	relation := page.Items[0]
+	f.afterCreate = func() {
+		if _, err := bindings.Unbind(ctx, owner, relation.ID, relation.Revision, command(t)); err != nil {
+			t.Error(err)
+		}
+	}
+	i, _, e := s.Create(ctx, owner, phone, command(t))
+	if e != nil {
+		t.Fatal(e)
+	}
+	if i.State != "draining" || i.BindingID != relation.ID || i.BindingRevision != relation.Revision {
+		t.Fatalf("stale grant delivered: %+v", i)
+	}
+	// 新关系不会取得旧slot；服务重启继续撤销，而不是把解绑恢复成active。
+	code, e := bindings.SelfCode(ctx, mobilePrincipal())
+	if e != nil {
+		t.Fatal(e)
+	}
+	newer, e := bindings.Bind(ctx, owner, code.Code, command(t))
+	if e != nil || newer.ID == relation.ID {
+		t.Fatal(e)
+	}
+	_, _, e = s.Create(ctx, owner, phone, command(t))
+	var local *Error
+	if !errors.As(e, &local) || local.Code != "DEVICE_OCCUPIED" {
+		t.Fatalf("draining slot reopened: %v", e)
+	}
+	restarted, e := NewStore(s.pool, scope, tenant, mobileApp, f)
+	if e != nil {
+		t.Fatal(e)
+	}
+	restarted.SetBindings(bindings)
+	if _, e = restarted.Recover(ctx, ""); e != nil {
+		t.Fatal(e)
+	}
+	old, e := restarted.Get(ctx, mobilePrincipal(), i.ID)
+	if e != nil || old.State != "draining" || old.DrainToken == "" {
+		t.Fatalf("recovery failed: %+v %v", old, e)
+	}
+	if _, e = restarted.Drained(ctx, mobilePrincipal(), old.ID, command(t), old.Generation, "", old.DrainToken, runtimeBoot, runtimeProof); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = restarted.Recover(ctx, ""); e != nil {
+		t.Fatal(e)
+	}
+	pending, e := bindings.PendingClosures(ctx, 100)
+	if e != nil || len(pending) != 0 {
+		t.Fatalf("closure not complete: %v %v", pending, e)
+	}
+}
+func TestUnboundControlCannotReadOrCreateAuthorization(t *testing.T) {
+	ctx := context.Background()
+	f := &fakeUpstream{domain: "binding"}
+	s := testStore(t, f)
+	bindings := s.bindings.(*binding.Store)
+	i, _, e := s.Create(ctx, owner, phone, command(t))
+	if e != nil {
+		t.Fatal(e)
+	}
+	relation, e := bindings.List(ctx, owner, "", 1)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = bindings.Unbind(ctx, mobilePrincipal(), relation.Items[0].ID, "1", command(t)); e != nil {
+		t.Fatal(e)
+	}
+	view, e := s.Get(ctx, mobilePrincipal(), i.ID)
+	if e != nil || view.State != "draining" {
+		t.Fatalf("phone authorized stale relation %+v %v", view, e)
+	}
+	if _, _, e = s.Create(ctx, owner, phone, command(t)); !errors.Is(e, binding.ErrNotBound) {
+		t.Fatalf("unbound created intent %v", e)
+	}
+	if f.calls != 1 {
+		t.Fatal("unbound issued grant")
+	}
+}
+
+type unavailableRevoke struct{ *fakeUpstream }
+
+func (unavailableRevoke) RevokeGrant(context.Context, string, string) error {
+	return identity.ErrUnavailable
+}
+func TestUnbindWithUndeliveredRevokeStaysPending(t *testing.T) {
+	ctx := context.Background()
+	f := &fakeUpstream{domain: "undelivered"}
+	s := testStore(t, f)
+	bindings := s.bindings.(*binding.Store)
+	i, _, e := s.Create(ctx, owner, phone, command(t))
+	if e != nil {
+		t.Fatal(e)
+	}
+	relation, e := bindings.List(ctx, owner, "", 1)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = bindings.Unbind(ctx, owner, relation.Items[0].ID, "1", command(t)); e != nil {
+		t.Fatal(e)
+	}
+	s.upstream = unavailableRevoke{f}
+	if _, e = s.Recover(ctx, ""); !errors.Is(e, identity.ErrUnavailable) {
+		t.Fatalf("undelivered revoke reported done: %v", e)
+	}
+	got, e := s.Get(ctx, mobilePrincipal(), i.ID)
+	if e != nil || got.State != "draining" || got.DrainToken != "" {
+		t.Fatalf("unconfirmed revoke issued drain challenge %+v %v", got, e)
+	}
+	pending, e := bindings.PendingClosures(ctx, 100)
+	if e != nil || len(pending) != 1 {
+		t.Fatal("lost persistent closure", e)
+	}
+	s.upstream = f
+	if _, e = s.Recover(ctx, ""); e != nil {
+		t.Fatal(e)
+	}
+	got, e = s.Get(ctx, mobilePrincipal(), i.ID)
+	if e != nil || got.DrainToken == "" {
+		t.Fatal("retry did not recover revoked proof", e)
+	}
+	// 通知丢失并不等于脚本/输入已排空。确认撤销后仍保留slot直到原运行时ACK。
+	var occupied bool
+	if e = s.pool.QueryRow(ctx, `SELECT active_intent IS NOT NULL FROM qm_control_slots WHERE service_scope=$1 AND target_uuid=$2`, scope, phone).Scan(&occupied); e != nil || !occupied {
+		t.Fatal("revocation alone released slot", e)
+	}
+}
+
+func TestCreateReplayCannotReviveReboundRelation(t *testing.T) {
+	for _, duringLookup := range []bool{false, true} {
+		name := "initial-replay"
+		if duringLookup {
+			name = "post-presence-replay"
+		}
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			f := &fakeUpstream{domain: "binding-replay"}
+			s := testStore(t, f)
+			bindings := s.bindings.(*binding.Store)
+			key := command(t)
+			var original Intent
+			rebind := func() {
+				var e error
+				original, _, e = s.Create(ctx, owner, phone, key)
+				if e != nil {
+					t.Fatal(e)
+				}
+				// Model a live admitted old intent, not only a pending reservation.
+				if _, e = s.pool.Exec(ctx, `UPDATE qm_control_intents SET state='active' WHERE service_scope=$1 AND id=$2`, scope, original.ID); e != nil {
+					t.Fatal(e)
+				}
+				page, e := bindings.List(ctx, owner, "", 1)
+				if e != nil {
+					t.Fatal(e)
+				}
+				if _, e = bindings.Unbind(ctx, owner, page.Items[0].ID, page.Items[0].Revision, command(t)); e != nil {
+					t.Fatal(e)
+				}
+				code, e := bindings.SelfCode(ctx, mobilePrincipal())
+				if e != nil {
+					t.Fatal(e)
+				}
+				newer, e := bindings.Bind(ctx, owner, code.Code, command(t))
+				if e != nil || newer.ID == original.BindingID {
+					t.Fatal("new relation not created", e)
+				}
+			}
+			if duringLookup {
+				// Another request creates the same command while the first is outside its
+				// transaction fetching presence, then the relation is revoked/re-created.
+				f.afterDevice = func() { f.afterDevice = nil; rebind() }
+			} else {
+				rebind()
+			}
+			replay, created, e := s.Create(ctx, owner, phone, key)
+			if e != nil || created || replay.ID != original.ID || replay.State != "draining" || replay.CloseReason != "unbound" || replay.BindingID != original.BindingID {
+				t.Fatalf("old authorization replayed: %+v created=%v err=%v", replay, created, e)
+			}
+			if f.calls != 1 {
+				t.Fatal("replay issued another grant")
+			}
+		})
 	}
 }

@@ -2,7 +2,7 @@ name: 业务服务验证
 
 on:
   push:
-    branches: ["codex/**"]
+    branches: ["master", "qm-app", "codex/**"]
     paths-ignore: ['docs/**', '**/*.md']
   workflow_dispatch:
 
@@ -66,4 +66,4 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      - run: go test -race -tags integration ./internal/catalog ./internal/bootstrap ./internal/access ./internal/httpapi ./internal/control
+      - run: go test -race -tags integration ./internal/catalog ./internal/bootstrap ./internal/binding ./internal/httpapi ./internal/control

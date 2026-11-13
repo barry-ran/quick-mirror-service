@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/barry-ran/quick-mirror-service/internal/binding"
 	"github.com/barry-ran/quick-mirror-service/internal/catalog"
 	"github.com/barry-ran/quick-mirror-service/internal/control"
 	"github.com/barry-ran/quick-mirror-service/internal/identity"
@@ -27,12 +28,12 @@ type ControlIntents interface {
 	Drained(context.Context, identity.Principal, string, string, string, string, string, string, string) (control.Intent, error)
 }
 type ControlHandler struct {
-	access AccessVerifier
+	access identity.Verifier
 	store  ControlIntents
 	active chan struct{}
 }
 
-func NewControlHandler(a AccessVerifier, s ControlIntents, limit int) (*ControlHandler, error) {
+func NewControlHandler(a identity.Verifier, s ControlIntents, limit int) (*ControlHandler, error) {
 	if a == nil || s == nil || limit < 1 || limit > 4096 {
 		return nil, catalog.ErrInvalidInput
 	}
@@ -87,12 +88,14 @@ func (h *ControlHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(401, "AUTH_INVALID", false)
 		return
 	}
-	p, e := h.access.VerifyAccess(ctx, token)
+	p, e := h.access.Verify(ctx, token)
 	if e != nil {
 		if errors.Is(e, identity.ErrInvalidCredential) {
 			fail(401, "AUTH_INVALID", false)
+		} else if errors.Is(e, identity.ErrForbidden) {
+			fail(403, "INSTALLATION_FORBIDDEN", false)
 		} else {
-			fail(503, "SERVICE_UNAVAILABLE", true)
+			fail(503, "UPSTREAM_UNAVAILABLE", true)
 		}
 		return
 	}
@@ -224,8 +227,11 @@ func (h *ControlHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if e != nil {
 		var ce *control.Error
+		var be *binding.Error
 		var size *http.MaxBytesError
 		switch {
+		case errors.As(e, &be):
+			fail(be.Status, be.Code, be.Status >= 500)
 		case errors.As(e, &ce):
 			fail(ce.Status, ce.Code, ce.Status == 429 || ce.Status == 503)
 		case errors.As(e, &size):

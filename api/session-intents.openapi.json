@@ -2,11 +2,12 @@
   "openapi": "3.1.0",
   "info": {
     "title": "QuickMirror 控制意图共享契约",
-    "version": "0.1.0"
+    "version": "0.1.0",
+    "description": "直接安装认证；控制意图固定持久binding_id/revision，创建、grant回写及手机accept重新核验关系。解绑通过持久outbox恢复关闭，不自动释放未知grant。"
   },
   "security": [
     {
-      "AccessToken": []
+      "InstallationCredential": []
     }
   ],
   "paths": {
@@ -420,10 +421,10 @@
   },
   "components": {
     "securitySchemes": {
-      "AccessToken": {
+      "InstallationCredential": {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "opaque"
+        "bearerFormat": "dev_opaque"
       }
     },
     "schemas": {
@@ -604,7 +605,8 @@
             "enum": [
               "user_pc",
               "user_phone",
-              "error"
+              "error",
+              "unbound"
             ]
           },
           "revision": {
@@ -617,6 +619,15 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 60000
+          },
+          "binding_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "binding_revision": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "x-maximum-decimal": "9223372036854775807"
           }
         },
         "required": [
@@ -626,7 +637,9 @@
           "business_generation",
           "state",
           "operation_outcome",
-          "revision"
+          "revision",
+          "binding_id",
+          "binding_revision"
         ]
       },
       "Error": {
@@ -757,7 +770,7 @@
         }
       },
       "HTTP401": {
-        "description": "安装业务token失效",
+        "description": "安装安装凭据失效",
         "content": {
           "application/json": {
             "schema": {

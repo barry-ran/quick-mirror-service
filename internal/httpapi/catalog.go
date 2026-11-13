@@ -18,24 +18,18 @@ import (
 	"github.com/barry-ran/quick-mirror-service/internal/identity"
 )
 
-// AccessVerifier 仅接受业务 access token，不能误接安装凭证的 Verify 方法。
-type AccessVerifier interface {
-	VerifyAccess(context.Context, string) (identity.Principal, error)
-}
-
 type DeviceCatalog interface {
-	ResolveBatch(context.Context, identity.Principal, []string) ([]catalog.Resolution, error)
 	UpdateStatus(context.Context, identity.Principal, catalog.Status) error
 }
 
-// CatalogHandler 通过业务令牌及来源凭证逐请求重验访问目录。
+// CatalogHandler 通过安装凭据逐请求权威校验访问目录。
 type CatalogHandler struct {
-	access    AccessVerifier
+	access    identity.Verifier
 	directory DeviceCatalog
 	active    chan struct{}
 }
 
-func NewCatalogHandler(access AccessVerifier, directory DeviceCatalog, maxConcurrent int) (*CatalogHandler, error) {
+func NewCatalogHandler(access identity.Verifier, directory DeviceCatalog, maxConcurrent int) (*CatalogHandler, error) {
 	if access == nil || directory == nil || maxConcurrent < 1 || maxConcurrent > 4096 {
 		return nil, catalog.ErrInvalidInput
 	}
@@ -73,9 +67,6 @@ func (h *CatalogHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	method := ""
 	role := identity.Role("")
 	switch r.URL.Path {
-	case "/qm/v1/devices/resolve":
-		method = http.MethodPost
-		role = identity.PC
 	case "/qm/v1/device-self/status":
 		method = http.MethodPut
 		role = identity.Mobile
@@ -107,7 +98,7 @@ func (h *CatalogHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
-	principal, err := h.access.VerifyAccess(ctx, token)
+	principal, err := h.access.Verify(ctx, token)
 	if err != nil {
 		if errors.Is(err, identity.ErrInvalidCredential) {
 			fail(401, "AUTH_INVALID", false)
@@ -134,38 +125,13 @@ func (h *CatalogHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	defer r.Body.Close()
 	var data any
-	if role == identity.PC {
-		var input struct {
-			UUIDs *[]string `json:"uuids"`
-		}
-		err = decodeStrictObject(r.Body, &input)
-		if err == nil && (input.UUIDs == nil || len(*input.UUIDs) > catalog.BatchSize) {
-			err = catalog.ErrInvalidInput
-		}
-		if err == nil {
-			var items []catalog.Resolution
-			items, err = h.directory.ResolveBatch(ctx, principal, *input.UUIDs)
-			if err == nil {
-				// resolve 只证明存在性；不把旧权限快照当成当前在线/可操作状态。
-				result := make([]map[string]any, 0, len(items))
-				for _, item := range items {
-					entry := map[string]any{"uuid": item.UUID, "found": item.Found}
-					if item.ErrorCode != "" {
-						entry["error_code"] = item.ErrorCode
-					}
-					result = append(result, entry)
-				}
-				data = map[string]any{"items": result}
-			}
-		}
-	} else {
-		var status catalog.Status
-		err = decodeStrictObject(r.Body, &status)
-		if err == nil {
-			err = h.directory.UpdateStatus(ctx, principal, status)
-		}
-		data = map[string]any{"accepted": true}
+
+	var status catalog.Status
+	err = decodeStrictObject(r.Body, &status)
+	if err == nil {
+		err = h.directory.UpdateStatus(ctx, principal, status)
 	}
+	data = map[string]any{"accepted": true}
 	if err != nil {
 		var size *http.MaxBytesError
 		switch {

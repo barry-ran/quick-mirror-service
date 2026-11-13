@@ -24,3 +24,7 @@ CREATE TABLE IF NOT EXISTS qm_control_commands (
 );
 CREATE INDEX IF NOT EXISTS qm_control_recovery ON qm_control_intents(service_scope,state);
 -- command摘要不自动清理；终态24h后查询返回UNKNOWN。保留的业务历史不含凭证/请求正文。
+
+-- Existing development intents have no binding and are safely drained, never grandfathered.
+ALTER TABLE qm_control_intents ADD COLUMN IF NOT EXISTS binding_id uuid;
+ALTER TABLE qm_control_intents ADD COLUMN IF NOT EXISTS binding_revision bigint;

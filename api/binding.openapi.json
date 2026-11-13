@@ -1,0 +1,1390 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "QuickMirror 安装与持久绑定接口",
+    "version": "0.2.0",
+    "description": "开发契约；实现和测试不代表PC/手机真机联调完成。所有请求直接携带Peerloom长期安装凭据并权威验证。无exchange、二维码、审批、账号登录或新增绑定限流。保留已有HTTP资源预算。请求JSON不超过64KiB，处理期限15秒。"
+  },
+  "security": [
+    {
+      "InstallationCredential": []
+    }
+  ],
+  "paths": {
+    "/qm/v1/installations/self/ensure": {
+      "post": {
+        "summary": "幂等建档；不覆盖绑定/码/boot/seq，也不制造在线证据",
+        "responses": {
+          "200": {
+            "description": "成功；解绑成功不表示资源已经排空。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnsureResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Empty"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/qm/v1/binding-code/self": {
+      "get": {
+        "summary": "查看自己的码与绑定状态",
+        "responses": {
+          "200": {
+            "description": "成功；解绑成功不表示资源已经排空。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/qm/v1/binding-code/self/refresh": {
+      "post": {
+        "summary": "仅未绑定手机可刷新；退休码永久不复用",
+        "responses": {
+          "200": {
+            "description": "成功；解绑成功不表示资源已经排空。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Empty"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ]
+      }
+    },
+    "/qm/v1/bindings": {
+      "post": {
+        "summary": "使用相反角色六位码绑定；允许目标离线，无对端审批",
+        "responses": {
+          "200": {
+            "description": "成功；解绑成功不表示资源已经排空。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BindRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ]
+      },
+      "get": {
+        "summary": "仅自己的有效关系；presence独立未知不清空关系",
+        "responses": {
+          "200": {
+            "description": "成功；解绑成功不表示资源已经排空。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 200
+            }
+          }
+        ]
+      }
+    },
+    "/qm/v1/bindings/batch": {
+      "post": {
+        "summary": "仅PC，每项独立事务；顶层认证失败不执行任何项",
+        "responses": {
+          "200": {
+            "description": "成功；解绑成功不表示资源已经排空。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/qm/v1/bindings/{id}/unbind": {
+      "post": {
+        "summary": "任一关系成员解绑，原子标记撤销并持久安排关闭",
+        "responses": {
+          "200": {
+            "description": "成功；解绑成功不表示资源已经排空。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "失败，按机器码处理；不得伪造空列表或重新分配操作键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnbindRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "InstallationCredential": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "dev_opaque",
+        "description": "Peerloom until_revoked安装凭据，不是管理service key或业务access token。"
+      }
+    },
+    "parameters": {
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 128,
+          "pattern": "^[^\\r\\n\\u0000]+$"
+        },
+        "description": "同一操作未知结果按原键原请求重试；成功响应保留24h，过期键返回OUTCOME_UNKNOWN，不重新执行。"
+      }
+    },
+    "schemas": {
+      "Relation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "binding_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "x-maximum-decimal": "9223372036854775807"
+          },
+          "pc_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mobile_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "close_pending": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "binding_id",
+          "revision",
+          "pc_id",
+          "mobile_id",
+          "active",
+          "close_pending"
+        ]
+      },
+      "Code": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{6}$",
+            "description": "保留前导零；不是安装认证秘密，不得记录明文日志。"
+          },
+          "bound": {
+            "type": "boolean"
+          },
+          "binding": {
+            "$ref": "#/components/schemas/Relation"
+          }
+        },
+        "required": [
+          "bound"
+        ],
+        "description": "PC始终返回固定码；未绑定手机返回当前码；已绑定手机不返回code，返回bound=true及binding。"
+      },
+      "Peer": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "上游metadata.name或device_name；未提供时为空，客户端本地备注兜底。"
+          },
+          "online": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "null 为权威 presence 无法确认，不等于离线。"
+          }
+        },
+        "required": [
+          "device_id",
+          "name",
+          "online"
+        ]
+      },
+      "Empty": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {},
+        "required": []
+      },
+      "BindRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{6}$",
+            "description": "保留前导零；不是安装认证秘密，不得记录明文日志。"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "UnbindRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "x-maximum-decimal": "9223372036854775807"
+          }
+        },
+        "required": [
+          "expected_revision"
+        ]
+      },
+      "BatchItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "client_item_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{6}$",
+            "description": "保留前导零；不是安装认证秘密，不得记录明文日志。"
+          },
+          "operation_key": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "^[^\\r\\n\\u0000]+$"
+          }
+        },
+        "required": [
+          "client_item_id",
+          "code",
+          "operation_key"
+        ]
+      },
+      "ItemError": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "retryable"
+        ]
+      },
+      "Ensure": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{6}$",
+            "description": "保留前导零；不是安装认证秘密，不得记录明文日志。"
+          },
+          "bound": {
+            "type": "boolean"
+          },
+          "binding": {
+            "$ref": "#/components/schemas/Relation"
+          },
+          "role": {
+            "enum": [
+              "pc",
+              "mobile"
+            ]
+          },
+          "device_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "service_scope": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "bound",
+          "role",
+          "device_id",
+          "service_scope"
+        ]
+      },
+      "BindingView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "binding_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "x-maximum-decimal": "9223372036854775807"
+          },
+          "pc_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mobile_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "close_pending": {
+            "type": "boolean"
+          },
+          "peer": {
+            "$ref": "#/components/schemas/Peer"
+          }
+        },
+        "required": [
+          "binding_id",
+          "revision",
+          "pc_id",
+          "mobile_id",
+          "active",
+          "close_pending",
+          "peer"
+        ]
+      },
+      "Page": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BindingView"
+            },
+            "maxItems": 200
+          },
+          "next_cursor": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "BatchRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "items": {
+              "$ref": "#/components/schemas/BatchItem"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "BatchResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "client_item_id": {
+                      "type": "string"
+                    },
+                    "binding": {
+                      "$ref": "#/components/schemas/Relation"
+                    }
+                  },
+                  "required": [
+                    "client_item_id",
+                    "binding"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "client_item_id": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "$ref": "#/components/schemas/ItemError"
+                    }
+                  },
+                  "required": [
+                    "client_item_id",
+                    "error"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "request_id": {
+            "type": "string"
+          },
+          "error": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "INVALID_CODE_FORMAT、CODE_INVALID、ROLE_MISMATCH、ALREADY_BOUND_TO_OTHER_PC、NOT_BOUND、BINDING_CHANGED、REFRESH_NOT_ALLOWED、CODE_SPACE_EXHAUSTED、CODE_ALLOCATION_RETRY、IDEMPOTENCY_CONFLICT、AUTH_INVALID、INSTALLATION_FORBIDDEN、UPSTREAM_UNAVAILABLE、OUTCOME_UNKNOWN等。"
+              },
+              "message": {
+                "type": "string"
+              },
+              "retryable": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "retryable"
+            ]
+          }
+        },
+        "required": [
+          "request_id",
+          "error"
+        ]
+      },
+      "RelationResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "request_id": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Relation"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ]
+      },
+      "CodeResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "request_id": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Code"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ]
+      },
+      "EnsureResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "request_id": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Ensure"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ]
+      },
+      "PageResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "request_id": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Page"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ]
+      },
+      "BatchResultResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "request_id": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/BatchResult"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ]
+      }
+    }
+  }
+}

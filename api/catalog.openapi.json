@@ -2,57 +2,23 @@
   "openapi": "3.1.0",
   "info": {
     "title": "QuickMirror 设备目录HTTP边界",
-    "version": "1.0.0"
+    "version": "1.0.0",
+    "description": "手机本人上报能力/权限/runtime快照，不作为在线证明。列表与添加使用binding.openapi.json，不提供UUID枚举入口。"
   },
   "security": [
     {
-      "AccessToken": []
+      "InstallationCredential": []
     }
   ],
   "components": {
     "securitySchemes": {
-      "AccessToken": {
+      "InstallationCredential": {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "opaque"
+        "bearerFormat": "dev_opaque"
       }
     },
     "schemas": {
-      "ResolveRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "uuids"
-        ],
-        "properties": {
-          "uuids": {
-            "type": "array",
-            "maxItems": 200,
-            "items": {
-              "type": "string"
-            },
-            "description": "单请求最多200，客户端继续分批；不是设备总数限制。非法UUID逐项返回错误。"
-          }
-        }
-      },
-      "Resolution": {
-        "type": "object",
-        "required": [
-          "uuid",
-          "found"
-        ],
-        "properties": {
-          "uuid": {
-            "type": "string"
-          },
-          "found": {
-            "type": "boolean"
-          },
-          "error_code": {
-            "type": "string"
-          }
-        }
-      },
       "Capability": {
         "type": "object",
         "additionalProperties": false,
@@ -163,70 +129,9 @@
     }
   },
   "paths": {
-    "/qm/v1/devices/resolve": {
-      "post": {
-        "description": "仅PC。当前阶段仅返回存在性，不输出旧权限作为在线证据；快照revision/status/events尚未实现。 运行时通过业务token逐请求重验来源身份。",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ResolveRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "request_id",
-                    "data"
-                  ],
-                  "properties": {
-                    "request_id": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "data": {
-                      "type": "object",
-                      "required": [
-                        "items"
-                      ],
-                      "properties": {
-                        "items": {
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/Resolution"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "400/401/403/404/409/413/415/429/503；所有层级拒绝重复键，正文最大1MiB，JSON深度32且值/键预算4096。",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/qm/v1/device-self/status": {
       "put": {
-        "description": "仅手机本人；身份来自业务token。PUT完整替换快照，未给权限默认false。不是在线心跳/会话续租。未注册目录404，旧seq/退役boot409。 运行时通过业务token逐请求重验来源身份。",
+        "description": "仅手机本人；身份来自安装凭据。PUT完整替换快照，未给权限默认false。不是在线心跳/会话续租。未注册目录404，旧seq/退役boot409。 运行时通过安装凭据逐请求重验来源身份。",
         "requestBody": {
           "required": true,
           "content": {

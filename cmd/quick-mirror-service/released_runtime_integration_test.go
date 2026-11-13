@@ -17,8 +17,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/barry-ran/quick-mirror-service/internal/access"
 )
 
 // 正式包环境不存在时只保留原TLS运行时测试，不声称执行了公开服务联调。
@@ -92,9 +90,8 @@ func prepareReleasedRuntime(t *testing.T, c *config) func(*http.Client, string) 
 		return data
 	}
 	type registration struct {
-		DeviceID   string    `json:"device_id"`
-		Credential string    `json:"device_credential"`
-		Expiry     time.Time `json:"expires_at"`
+		DeviceID   string `json:"device_id"`
+		Credential string `json:"device_credential"`
 	}
 	create := func(name string) (string, registration) {
 		t.Helper()
@@ -112,9 +109,9 @@ func prepareReleasedRuntime(t *testing.T, c *config) func(*http.Client, string) 
 		if json.Unmarshal(data, &grant) != nil || grant.Grant == "" {
 			t.Fatal("invalid grant response")
 		}
-		data = call(upstreamClient, upstream.URL, "POST", "/v1/device-registrations", "", map[string]any{"application_id": application.ID, "platform": "linux", "installation_public_key": "runtime-test-" + application.ID, "registration_grant": grant.Grant}, 201)
+		data = call(upstreamClient, upstream.URL, "POST", "/v1/device-registrations", "", map[string]any{"application_id": application.ID, "platform": "linux", "installation_tag": "runtime-test-" + application.ID, "registration_grant": grant.Grant}, 201)
 		var device registration
-		if json.Unmarshal(data, &device) != nil || device.DeviceID == "" || device.Credential == "" || device.Expiry.IsZero() {
+		if json.Unmarshal(data, &device) != nil || device.DeviceID == "" || device.Credential == "" {
 			t.Fatal("invalid registration response")
 		}
 		return application.ID, device
@@ -124,43 +121,16 @@ func prepareReleasedRuntime(t *testing.T, c *config) func(*http.Client, string) 
 	c.HTTP.Identity.PCApplicationID = pcApp
 	c.HTTP.Identity.MobileApplicationID = mobileApp
 	return func(client *http.Client, origin string) {
-		issue := func(path string, device registration) access.Token {
-			t.Helper()
-			data := call(client, origin, "POST", path, device.Credential, map[string]any{}, 200)
-			var result struct {
-				Data access.Token `json:"data"`
-			}
-			if json.Unmarshal(data, &result) != nil {
-				t.Fatal("invalid exchange response")
-			}
-			token := result.Data
-			if token.AccessToken == "" || token.Scope != c.HTTP.ServiceScope || token.ExpiresAt.After(device.Expiry) || token.ExpiresAt.After(time.Now().Add(15*time.Minute)) || !token.ExpiresAt.After(time.Now()) {
-				t.Fatal("exchange principal/TTL invalid")
-			}
-			return token
-		}
-		mobileToken := issue("/qm/v1/auth/device/exchange", mobile)
-		pcToken := issue("/qm/v1/auth/pc/exchange", pc)
-		data := call(client, origin, "POST", "/qm/v1/devices/resolve", pcToken.AccessToken, map[string]any{"uuids": []string{mobile.DeviceID}}, 200)
-		var resolved struct {
-			Data struct {
-				Items []struct {
-					Found bool `json:"found"`
-				} `json:"items"`
-			} `json:"data"`
-		}
-		if json.Unmarshal(data, &resolved) != nil || len(resolved.Data.Items) != 1 || !resolved.Data.Items[0].Found {
-			t.Fatal("mobile exchange did not register catalog")
-		}
+		call(client, origin, "POST", "/qm/v1/installations/self/ensure", mobile.Credential, map[string]any{}, 200)
+		call(client, origin, "POST", "/qm/v1/installations/self/ensure", pc.Credential, map[string]any{}, 200)
 		status := map[string]any{"boot_id": "55555555-5555-4555-8555-555555555555", "seq": 7, "app_version": "runtime-fixture", "permissions": map[string]any{"projection": true}}
-		call(client, origin, "PUT", "/qm/v1/device-self/status", mobileToken.AccessToken, status, 200)
-		issue("/qm/v1/auth/device/exchange", mobile)
-		call(client, origin, "PUT", "/qm/v1/device-self/status", mobileToken.AccessToken, status, 409)
-		call(client, origin, "POST", "/qm/v1/auth/pc/exchange", mobile.Credential, map[string]any{}, 403)
+		call(client, origin, "PUT", "/qm/v1/device-self/status", mobile.Credential, status, 200)
+		call(client, origin, "POST", "/qm/v1/installations/self/ensure", mobile.Credential, map[string]any{}, 200)
+		call(client, origin, "PUT", "/qm/v1/device-self/status", mobile.Credential, status, 409)
+		call(client, origin, "PUT", "/qm/v1/device-self/status", pc.Credential, status, 403)
 		call(upstreamClient, upstream.URL, "POST", "/v1/devices/"+mobile.DeviceID+"/revoke", serviceKey, nil, 200)
-		call(client, origin, "PUT", "/qm/v1/device-self/status", mobileToken.AccessToken, status, 401)
-		call(client, origin, "POST", "/qm/v1/auth/device/exchange", mobile.Credential, map[string]any{}, 401)
-		call(client, origin, "POST", "/qm/v1/devices/resolve", pcToken.AccessToken, map[string]any{"uuids": []string{mobile.DeviceID}}, 200)
-		t.Log("formal Peerloom + verified-TLS PostgreSQL + HTTPS runtime: exchange/TTL/catalog/status/re-exchange/role/source-revocation passed")
+		call(client, origin, "POST", "/qm/v1/installations/self/ensure", mobile.Credential, map[string]any{}, 401)
+		call(client, origin, "POST", "/qm/v1/installations/self/ensure", pc.Credential, map[string]any{}, 200)
+		t.Log("formal Peerloom + verified-TLS PostgreSQL + HTTPS runtime: direct authentication/ensure/status/role/revocation passed")
 	}
 }
