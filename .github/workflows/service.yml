@@ -66,4 +66,5 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
+      - run: python3 scripts/validate-openapi.py
       - run: go test -race -tags integration ./internal/catalog ./internal/bootstrap ./internal/binding ./internal/httpapi ./internal/control
