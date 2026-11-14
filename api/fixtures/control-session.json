@@ -836,6 +836,710 @@
         "running_script": []
       },
       "valid": false
+    },
+    {
+      "name": "helloResult-capabilitySet-legacy",
+      "definition": "helloResult",
+      "valid": true,
+      "message": {
+        "permissions": {
+          "projection": false,
+          "accessibility": true,
+          "ime": false
+        },
+        "capabilities": {
+          "navigation_v1": {
+            "supported": true,
+            "available": true
+          }
+        },
+        "capture": "missing",
+        "capture_geometry": null,
+        "running_script": [],
+        "rpc_major": 1,
+        "scrcpy_profile": "quick-scrcpy-control-v1"
+      }
+    },
+    {
+      "name": "helloResult-response-legacy",
+      "result_definition": "helloResult",
+      "valid": true,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "1",
+        "kind": "response",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "ok": true,
+        "result": {
+          "permissions": {
+            "projection": false,
+            "accessibility": true,
+            "ime": false
+          },
+          "capabilities": {
+            "navigation_v1": {
+              "supported": true,
+              "available": true
+            }
+          },
+          "capture": "missing",
+          "capture_geometry": null,
+          "running_script": [],
+          "rpc_major": 1,
+          "scrcpy_profile": "quick-scrcpy-control-v1"
+        }
+      }
+    },
+    {
+      "name": "helloResult-capabilitySet-empty",
+      "definition": "helloResult",
+      "valid": true,
+      "message": {
+        "permissions": {
+          "projection": false,
+          "accessibility": true,
+          "ime": false
+        },
+        "capabilities": {
+          "navigation_v1": {
+            "supported": true,
+            "available": true,
+            "actions": []
+          }
+        },
+        "capture": "missing",
+        "capture_geometry": null,
+        "running_script": [],
+        "rpc_major": 1,
+        "scrcpy_profile": "quick-scrcpy-control-v1"
+      }
+    },
+    {
+      "name": "helloResult-response-empty",
+      "result_definition": "helloResult",
+      "valid": true,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "1",
+        "kind": "response",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "ok": true,
+        "result": {
+          "permissions": {
+            "projection": false,
+            "accessibility": true,
+            "ime": false
+          },
+          "capabilities": {
+            "navigation_v1": {
+              "supported": true,
+              "available": true,
+              "actions": []
+            }
+          },
+          "capture": "missing",
+          "capture_geometry": null,
+          "running_script": [],
+          "rpc_major": 1,
+          "scrcpy_profile": "quick-scrcpy-control-v1"
+        }
+      }
+    },
+    {
+      "name": "helloResult-capabilitySet-six",
+      "definition": "helloResult",
+      "valid": true,
+      "message": {
+        "permissions": {
+          "projection": false,
+          "accessibility": true,
+          "ime": false
+        },
+        "capabilities": {
+          "navigation_v1": {
+            "supported": true,
+            "available": true,
+            "actions": [
+              "back",
+              "home",
+              "recents",
+              "volume_up",
+              "volume_down",
+              "notifications"
+            ]
+          }
+        },
+        "capture": "missing",
+        "capture_geometry": null,
+        "running_script": [],
+        "rpc_major": 1,
+        "scrcpy_profile": "quick-scrcpy-control-v1"
+      }
+    },
+    {
+      "name": "helloResult-response-six",
+      "result_definition": "helloResult",
+      "valid": true,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "1",
+        "kind": "response",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "ok": true,
+        "result": {
+          "permissions": {
+            "projection": false,
+            "accessibility": true,
+            "ime": false
+          },
+          "capabilities": {
+            "navigation_v1": {
+              "supported": true,
+              "available": true,
+              "actions": [
+                "back",
+                "home",
+                "recents",
+                "volume_up",
+                "volume_down",
+                "notifications"
+              ]
+            }
+          },
+          "capture": "missing",
+          "capture_geometry": null,
+          "running_script": [],
+          "rpc_major": 1,
+          "scrcpy_profile": "quick-scrcpy-control-v1"
+        }
+      }
+    },
+    {
+      "name": "helloResult-capabilitySet-other",
+      "definition": "helloResult",
+      "valid": false,
+      "message": {
+        "permissions": {
+          "projection": false,
+          "accessibility": true,
+          "ime": false
+        },
+        "capabilities": {
+          "touch": {
+            "supported": true,
+            "available": true,
+            "actions": []
+          }
+        },
+        "capture": "missing",
+        "capture_geometry": null,
+        "running_script": [],
+        "rpc_major": 1,
+        "scrcpy_profile": "quick-scrcpy-control-v1"
+      }
+    },
+    {
+      "name": "helloResult-response-other",
+      "result_definition": "helloResult",
+      "valid": false,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "1",
+        "kind": "response",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "ok": true,
+        "result": {
+          "permissions": {
+            "projection": false,
+            "accessibility": true,
+            "ime": false
+          },
+          "capabilities": {
+            "touch": {
+              "supported": true,
+              "available": true,
+              "actions": []
+            }
+          },
+          "capture": "missing",
+          "capture_geometry": null,
+          "running_script": [],
+          "rpc_major": 1,
+          "scrcpy_profile": "quick-scrcpy-control-v1"
+        }
+      }
+    },
+    {
+      "name": "helloResult-capabilitySet-unknown",
+      "definition": "helloResult",
+      "valid": false,
+      "message": {
+        "permissions": {
+          "projection": false,
+          "accessibility": true,
+          "ime": false
+        },
+        "capabilities": {
+          "navigation_v1": {
+            "supported": true,
+            "available": true,
+            "actions": [
+              "power"
+            ]
+          }
+        },
+        "capture": "missing",
+        "capture_geometry": null,
+        "running_script": [],
+        "rpc_major": 1,
+        "scrcpy_profile": "quick-scrcpy-control-v1"
+      }
+    },
+    {
+      "name": "helloResult-response-unknown",
+      "result_definition": "helloResult",
+      "valid": false,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "1",
+        "kind": "response",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "ok": true,
+        "result": {
+          "permissions": {
+            "projection": false,
+            "accessibility": true,
+            "ime": false
+          },
+          "capabilities": {
+            "navigation_v1": {
+              "supported": true,
+              "available": true,
+              "actions": [
+                "power"
+              ]
+            }
+          },
+          "capture": "missing",
+          "capture_geometry": null,
+          "running_script": [],
+          "rpc_major": 1,
+          "scrcpy_profile": "quick-scrcpy-control-v1"
+        }
+      }
+    },
+    {
+      "name": "helloResult-capabilitySet-duplicate",
+      "definition": "helloResult",
+      "valid": false,
+      "message": {
+        "permissions": {
+          "projection": false,
+          "accessibility": true,
+          "ime": false
+        },
+        "capabilities": {
+          "navigation_v1": {
+            "supported": true,
+            "available": true,
+            "actions": [
+              "home",
+              "home"
+            ]
+          }
+        },
+        "capture": "missing",
+        "capture_geometry": null,
+        "running_script": [],
+        "rpc_major": 1,
+        "scrcpy_profile": "quick-scrcpy-control-v1"
+      }
+    },
+    {
+      "name": "helloResult-response-duplicate",
+      "result_definition": "helloResult",
+      "valid": false,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "1",
+        "kind": "response",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "ok": true,
+        "result": {
+          "permissions": {
+            "projection": false,
+            "accessibility": true,
+            "ime": false
+          },
+          "capabilities": {
+            "navigation_v1": {
+              "supported": true,
+              "available": true,
+              "actions": [
+                "home",
+                "home"
+              ]
+            }
+          },
+          "capture": "missing",
+          "capture_geometry": null,
+          "running_script": [],
+          "rpc_major": 1,
+          "scrcpy_profile": "quick-scrcpy-control-v1"
+        }
+      }
+    },
+    {
+      "name": "stateResult-capabilitySet-legacy",
+      "definition": "stateResult",
+      "valid": true,
+      "message": {
+        "permissions": {
+          "projection": false,
+          "accessibility": true,
+          "ime": false
+        },
+        "capabilities": {
+          "navigation_v1": {
+            "supported": true,
+            "available": true
+          }
+        },
+        "capture": "missing",
+        "capture_geometry": null,
+        "running_script": []
+      }
+    },
+    {
+      "name": "stateResult-response-legacy",
+      "result_definition": "stateResult",
+      "valid": true,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "1",
+        "kind": "response",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "ok": true,
+        "result": {
+          "permissions": {
+            "projection": false,
+            "accessibility": true,
+            "ime": false
+          },
+          "capabilities": {
+            "navigation_v1": {
+              "supported": true,
+              "available": true
+            }
+          },
+          "capture": "missing",
+          "capture_geometry": null,
+          "running_script": []
+        }
+      }
+    },
+    {
+      "name": "stateResult-capabilitySet-empty",
+      "definition": "stateResult",
+      "valid": true,
+      "message": {
+        "permissions": {
+          "projection": false,
+          "accessibility": true,
+          "ime": false
+        },
+        "capabilities": {
+          "navigation_v1": {
+            "supported": true,
+            "available": true,
+            "actions": []
+          }
+        },
+        "capture": "missing",
+        "capture_geometry": null,
+        "running_script": []
+      }
+    },
+    {
+      "name": "stateResult-response-empty",
+      "result_definition": "stateResult",
+      "valid": true,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "1",
+        "kind": "response",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "ok": true,
+        "result": {
+          "permissions": {
+            "projection": false,
+            "accessibility": true,
+            "ime": false
+          },
+          "capabilities": {
+            "navigation_v1": {
+              "supported": true,
+              "available": true,
+              "actions": []
+            }
+          },
+          "capture": "missing",
+          "capture_geometry": null,
+          "running_script": []
+        }
+      }
+    },
+    {
+      "name": "stateResult-capabilitySet-six",
+      "definition": "stateResult",
+      "valid": true,
+      "message": {
+        "permissions": {
+          "projection": false,
+          "accessibility": true,
+          "ime": false
+        },
+        "capabilities": {
+          "navigation_v1": {
+            "supported": true,
+            "available": true,
+            "actions": [
+              "back",
+              "home",
+              "recents",
+              "volume_up",
+              "volume_down",
+              "notifications"
+            ]
+          }
+        },
+        "capture": "missing",
+        "capture_geometry": null,
+        "running_script": []
+      }
+    },
+    {
+      "name": "stateResult-response-six",
+      "result_definition": "stateResult",
+      "valid": true,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "1",
+        "kind": "response",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "ok": true,
+        "result": {
+          "permissions": {
+            "projection": false,
+            "accessibility": true,
+            "ime": false
+          },
+          "capabilities": {
+            "navigation_v1": {
+              "supported": true,
+              "available": true,
+              "actions": [
+                "back",
+                "home",
+                "recents",
+                "volume_up",
+                "volume_down",
+                "notifications"
+              ]
+            }
+          },
+          "capture": "missing",
+          "capture_geometry": null,
+          "running_script": []
+        }
+      }
+    },
+    {
+      "name": "stateResult-capabilitySet-other",
+      "definition": "stateResult",
+      "valid": false,
+      "message": {
+        "permissions": {
+          "projection": false,
+          "accessibility": true,
+          "ime": false
+        },
+        "capabilities": {
+          "touch": {
+            "supported": true,
+            "available": true,
+            "actions": []
+          }
+        },
+        "capture": "missing",
+        "capture_geometry": null,
+        "running_script": []
+      }
+    },
+    {
+      "name": "stateResult-response-other",
+      "result_definition": "stateResult",
+      "valid": false,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "1",
+        "kind": "response",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "ok": true,
+        "result": {
+          "permissions": {
+            "projection": false,
+            "accessibility": true,
+            "ime": false
+          },
+          "capabilities": {
+            "touch": {
+              "supported": true,
+              "available": true,
+              "actions": []
+            }
+          },
+          "capture": "missing",
+          "capture_geometry": null,
+          "running_script": []
+        }
+      }
+    },
+    {
+      "name": "stateResult-capabilitySet-unknown",
+      "definition": "stateResult",
+      "valid": false,
+      "message": {
+        "permissions": {
+          "projection": false,
+          "accessibility": true,
+          "ime": false
+        },
+        "capabilities": {
+          "navigation_v1": {
+            "supported": true,
+            "available": true,
+            "actions": [
+              "power"
+            ]
+          }
+        },
+        "capture": "missing",
+        "capture_geometry": null,
+        "running_script": []
+      }
+    },
+    {
+      "name": "stateResult-response-unknown",
+      "result_definition": "stateResult",
+      "valid": false,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "1",
+        "kind": "response",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "ok": true,
+        "result": {
+          "permissions": {
+            "projection": false,
+            "accessibility": true,
+            "ime": false
+          },
+          "capabilities": {
+            "navigation_v1": {
+              "supported": true,
+              "available": true,
+              "actions": [
+                "power"
+              ]
+            }
+          },
+          "capture": "missing",
+          "capture_geometry": null,
+          "running_script": []
+        }
+      }
+    },
+    {
+      "name": "stateResult-capabilitySet-duplicate",
+      "definition": "stateResult",
+      "valid": false,
+      "message": {
+        "permissions": {
+          "projection": false,
+          "accessibility": true,
+          "ime": false
+        },
+        "capabilities": {
+          "navigation_v1": {
+            "supported": true,
+            "available": true,
+            "actions": [
+              "home",
+              "home"
+            ]
+          }
+        },
+        "capture": "missing",
+        "capture_geometry": null,
+        "running_script": []
+      }
+    },
+    {
+      "name": "stateResult-response-duplicate",
+      "result_definition": "stateResult",
+      "valid": false,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "1",
+        "kind": "response",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "ok": true,
+        "result": {
+          "permissions": {
+            "projection": false,
+            "accessibility": true,
+            "ime": false
+          },
+          "capabilities": {
+            "navigation_v1": {
+              "supported": true,
+              "available": true,
+              "actions": [
+                "home",
+                "home"
+              ]
+            }
+          },
+          "capture": "missing",
+          "capture_geometry": null,
+          "running_script": []
+        }
+      }
     }
   ],
   "attach_cases": [

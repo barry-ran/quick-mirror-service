@@ -33,6 +33,9 @@ cases = fixtures['cases']
 for case in cases:
     target = schema if 'definition' not in case else {'$ref': '#/$defs/' + case['definition'], '$defs': schema['$defs']}
     valid = Validator(target, format_checker=FormatChecker()).is_valid(case['message'])
+    if 'result_definition' in case:
+        result_schema = {'$ref': '#/$defs/' + case['result_definition'], '$defs': schema['$defs']}
+        valid = valid and Validator(result_schema, format_checker=FormatChecker()).is_valid(case['message']['result'])
     assert valid == case['valid'], case['name']
 for case in fixtures['attach_cases']:
     valid = case['video'] == 'qm.v1.video.' + case['generation'] and case['control'] == 'qm.v1.control.' + case['generation']
@@ -62,3 +65,8 @@ assert {case['message']['params']['action'] for case in cases
         if case['valid'] and case['message'].get('op') == 'navigation.v1'} == navigation_actions
 assert set(schema['$defs']['navigationCapability']['properties']['actions']['items']['enum']) == navigation_actions
 print('navigation.v1 六项请求、能力兼容/拒绝与 API 接纳结果结构校验通过；不代表真机执行验收。')
+
+# RPC envelope and operation-specific result are validated separately, as in the client.
+for container in ('helloResult', 'stateResult'):
+    assert schema['$defs'][container]['properties']['capabilities'] == {'$ref': '#/$defs/capabilitySet'}
+    assert sum(c.get('result_definition') == container for c in cases) >= 6
