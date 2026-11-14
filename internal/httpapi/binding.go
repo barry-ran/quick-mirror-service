@@ -56,7 +56,9 @@ func (h *BindingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(503)
 		return
 	}
-	requestID := fmt.Sprintf("%x", random)
+	random[6] = (random[6] & 0x0f) | 0x40
+	random[8] = (random[8] & 0x3f) | 0x80
+	requestID := fmt.Sprintf("%x-%x-%x-%x-%x", random[:4], random[4:6], random[6:8], random[8:10], random[10:])
 	failure := func(status int, code string, retry bool) {
 		if status == 401 {
 			w.Header().Set("WWW-Authenticate", `Bearer realm="quickmirror"`)

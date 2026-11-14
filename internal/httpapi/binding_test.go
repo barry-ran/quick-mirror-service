@@ -145,3 +145,56 @@ func TestEnsureDoesNotRegisterPCAsMobile(t *testing.T) {
 		})
 	}
 }
+
+func TestBindingEnvelopeRequestIDIsCanonicalUUIDv4(t *testing.T) {
+	seen := make(map[string]bool)
+	for _, tc := range []struct {
+		name, method, path string
+		authenticated      bool
+		status             int
+	}{
+		{"ensure", "POST", "/qm/v1/installations/self/ensure", true, 200},
+		{"binding-code", "GET", "/qm/v1/binding-code/self", true, 200},
+		{"bindings", "GET", "/qm/v1/bindings", true, 200},
+		{"unauthorized", "POST", "/qm/v1/installations/self/ensure", false, 401},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h, err := NewBindingHandler(fixtureAccess(identity.PC), &bindingFixture{}, &bindingRegistry{}, unknownPresence{}, scope, 2)
+			if err != nil {
+				t.Fatal(err)
+			}
+			r := httptest.NewRequest(tc.method, tc.path, strings.NewReader(`{}`))
+			r.Header.Set("Content-Type", "application/json")
+			if tc.authenticated {
+				r.Header.Set("Authorization", "Bearer fixture")
+			}
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, r)
+			if w.Code != tc.status {
+				t.Fatalf("status: got %d want %d", w.Code, tc.status)
+			}
+			var envelope struct {
+				RequestID string          `json:"request_id"`
+				Data      json.RawMessage `json:"data"`
+				Error     json.RawMessage `json:"error"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &envelope); err != nil {
+				t.Fatal(err)
+			}
+			id, valid := identity.NormalizeUUID(envelope.RequestID)
+			if !valid || id != envelope.RequestID || len(id) != 36 {
+				t.Fatalf("noncanonical request_id: %q", envelope.RequestID)
+			}
+			if id[14] != '4' || !strings.ContainsRune("89ab", rune(id[19])) {
+				t.Fatalf("not UUIDv4 with RFC variant: %q", id)
+			}
+			if seen[id] {
+				t.Fatal("request_id reused across responses")
+			}
+			seen[id] = true
+			if tc.status == 200 && len(envelope.Data) == 0 || tc.status == 401 && len(envelope.Error) == 0 {
+				t.Fatal("missing expected envelope payload")
+			}
+		})
+	}
+}
