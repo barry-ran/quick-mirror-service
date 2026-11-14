@@ -744,16 +744,7 @@
           "$ref": "#/$defs/permissions"
         },
         "capabilities": {
-          "type": "object",
-          "maxProperties": 64,
-          "additionalProperties": {
-            "$ref": "#/$defs/capability"
-          },
-          "properties": {
-            "navigation_v1": {
-              "$ref": "#/$defs/navigationCapability"
-            }
-          }
+          "$ref": "#/$defs/capabilitySet"
         },
         "capture": {
           "enum": [
@@ -836,11 +827,7 @@
           "$ref": "#/$defs/permissions"
         },
         "capabilities": {
-          "type": "object",
-          "maxProperties": 64,
-          "additionalProperties": {
-            "$ref": "#/$defs/capability"
-          }
+          "$ref": "#/$defs/capabilitySet"
         },
         "capture": {
           "enum": [
@@ -984,6 +971,18 @@
         "supported",
         "available"
       ]
+    },
+    "capabilitySet": {
+      "type": "object",
+      "maxProperties": 64,
+      "additionalProperties": {
+        "$ref": "#/$defs/capability"
+      },
+      "properties": {
+        "navigation_v1": {
+          "$ref": "#/$defs/navigationCapability"
+        }
+      }
     }
   }
 }
