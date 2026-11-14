@@ -24,10 +24,15 @@ func TestGenerationCanonicalBoundaries(t *testing.T) {
 }
 
 func TestPreviousBootVisibleOnlyToMobile(t *testing.T) {
-	original := Intent{runtimeBoot: "88888888-8888-4888-8888-888888888888", runtimeHash: []byte("secret-hash"), DrainToken: "challenge"}
+	original := Intent{Session: "99999999-9999-4999-8999-999999999999", runtimeBoot: "88888888-8888-4888-8888-888888888888", runtimeHash: []byte("secret-hash"), DrainToken: "challenge"}
 	mobile := visible(original, identity.Principal{Role: identity.Mobile})
 	if mobile.PreviousBootID != original.runtimeBoot {
 		t.Fatal("mobile missing original boot")
+	}
+	unbound := original
+	unbound.Session = ""
+	if visible(unbound, identity.Principal{Role: identity.Mobile}).PreviousBootID != "" {
+		t.Fatal("unbound intent changed recovery contract")
 	}
 	pc := visible(mobile, identity.Principal{Role: identity.PC})
 	if pc.PreviousBootID != "" || pc.DrainToken != "" {

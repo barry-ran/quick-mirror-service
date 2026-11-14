@@ -141,8 +141,10 @@ func visible(i Intent, p identity.Principal) Intent {
 	if p.Role != identity.Mobile {
 		i.DrainToken = ""
 		i.PreviousBootID = ""
-	} else {
+	} else if i.Session != "" {
 		i.PreviousBootID = i.runtimeBoot
+	} else {
+		i.PreviousBootID = ""
 	}
 	return i
 }
@@ -270,6 +272,7 @@ func (s *Store) Current(ctx context.Context, p identity.Principal) (*Intent, err
 			i.DrainToken = ""
 		}
 	}
+	i = visible(i, p)
 	return &i, e
 }
 func (s *Store) ByCommand(ctx context.Context, p identity.Principal, key string) (Intent, error) {

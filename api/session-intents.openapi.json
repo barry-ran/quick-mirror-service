@@ -701,7 +701,7 @@
           "previous_boot_id": {
             "type": "string",
             "format": "uuid",
-            "description": "仅 mobile 可见的原意图运行时 boot；用于区分新运行时恢复，不是 OS 进程或触点完成证明。"
+            "description": "仅已绑定意图的 mobile 响应可见的原运行时 boot；用于区分新运行时恢复，不是 OS 进程或触点完成证明。"
           }
         },
         "required": [
@@ -818,7 +818,7 @@
           "session_id": {
             "type": "string",
             "format": "uuid",
-            "description": "仅已有绑定时必须提供并严格匹配；未绑定时必须省略，不能伪造会话。"
+            "description": "必填；必须是旧已绑定 intent 的非空 session UUID，未绑定意图不使用 recovered。"
           },
           "drain_token": {
             "type": "string",

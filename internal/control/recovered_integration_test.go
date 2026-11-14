@@ -62,6 +62,10 @@ func TestBoundRecoveryNewRuntimeReleasesAndReplayPreservesNewSlot(t *testing.T) 
 	if i.PreviousBootID != runtimeBoot {
 		t.Fatal("missing immutable boot")
 	}
+	currentBefore, err := s.Current(context.Background(), mobilePrincipal())
+	if err != nil || currentBefore == nil || currentBefore.PreviousBootID != i.PreviousBootID {
+		t.Fatal("Current/Get recovery metadata differs", err)
+	}
 	key := command(t)
 	got, err := s.Recovered(context.Background(), mobilePrincipal(), i.ID, key, i.Generation, i.Session, i.DrainToken, boot, proof)
 	if err != nil || got.State != "released" {
@@ -187,5 +191,30 @@ func TestBoundRecoveryRuntimeRowPinnedUntilTransactionEnds(t *testing.T) {
 	}
 	if err = directory.UpdateStatus(context.Background(), mobilePrincipal(), catalog.Status{BootID: command(t), Sequence: 1, RuntimeProof: proof}); err != nil {
 		t.Fatal("catalog stayed blocked after rollback", err)
+	}
+}
+
+func TestUnboundCurrentAndGetDoNotExposeRecoveryBoot(t *testing.T) {
+	s := testStore(t, &fakeUpstream{domain: "a"})
+	i, _, err := s.Create(context.Background(), owner, phone, command(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.Close(context.Background(), owner, i.ID, command(t), "user_pc"); err != nil {
+		t.Fatal(err)
+	}
+	current, err := s.Current(context.Background(), mobilePrincipal())
+	if err != nil || current == nil {
+		t.Fatal(err)
+	}
+	got, err := s.Get(context.Background(), mobilePrincipal(), i.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if current.Session != "" || got.Session != "" || current.PreviousBootID != "" || got.PreviousBootID != "" {
+		t.Fatal("unbound contract gained recovery barrier")
+	}
+	if _, err = s.Drained(context.Background(), mobilePrincipal(), i.ID, command(t), i.Generation, "", current.DrainToken, runtimeBoot, runtimeProof); err != nil {
+		t.Fatal("unbound normal drain failed", err)
 	}
 }
