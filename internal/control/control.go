@@ -790,7 +790,7 @@ func (s *Store) progressDrain(ctx context.Context, id string) error {
 	if e != nil {
 		return e
 	}
-	if i.State != "draining" || i.grant == "" || i.revoked {
+	if i.State != "draining" || i.grant == "" || (i.revoked && i.Session != "") {
 		return nil
 	}
 	g, e := s.upstream.GetGrant(ctx, i.grant)
@@ -823,7 +823,33 @@ func (s *Store) progressDrain(ctx context.Context, id string) error {
 	if e != nil {
 		return e
 	}
-	if i.State != "draining" || i.revoked {
+	if i.State != "draining" || i.grant != g.ID || i.Owner != g.SourceDeviceID || i.Target != g.TargetDeviceID {
+		return nil
+	}
+	// A never-bound intent could not have opened the mobile execution gate.
+	// Bind commits session_id under this same scope lock before accept is allowed.
+	// Recheck after the network call: a concurrent successful Bind must never be
+	// mistaken for an unbound intent. Runtime replacement alone is NOT a drain ACK.
+	if i.Session == "" {
+		var boot *string
+		var proof []byte
+		if e = tx.QueryRow(ctx, `SELECT boot_id::text,runtime_proof_hash FROM qm_device_catalog WHERE service_scope=$1 AND device_uuid=$2 FOR SHARE`, s.scope, i.Target).Scan(&boot, &proof); e != nil {
+			return e
+		}
+		if boot != nil && len(proof) == sha256.Size && (*boot != i.runtimeBoot || subtle.ConstantTimeCompare(proof, i.runtimeHash) != 1) {
+			if e = bump(i); e != nil {
+				return e
+			}
+			if _, e = tx.Exec(ctx, `UPDATE qm_control_intents SET revoked=true WHERE service_scope=$1 AND id=$2`, s.scope, id); e != nil {
+				return e
+			}
+			if e = s.finish(ctx, tx, id, "released"); e != nil {
+				return e
+			}
+			return tx.Commit(ctx)
+		}
+	}
+	if i.revoked {
 		return nil
 	}
 	if e = bump(i); e != nil {

@@ -34,15 +34,18 @@ const grantID = "66666666-6666-4666-8666-666666666666"
 var owner = identity.Principal{DeviceID: pc, TenantID: tenant, ApplicationID: "77777777-7777-4777-8777-777777777777", Role: identity.PC}
 
 type fakeUpstream struct {
-	mu          sync.Mutex
-	calls       int
-	domain      string
-	unknown     bool
-	deviceError error
-	grant       peerloom.ControlGrant
-	session     peerloom.ControlSession
-	afterCreate func()
-	afterDevice func()
+	mu            sync.Mutex
+	calls         int
+	domain        string
+	unknown       bool
+	deviceError   error
+	grant         peerloom.ControlGrant
+	session       peerloom.ControlSession
+	afterCreate   func()
+	afterDevice   func()
+	afterSession  func()
+	getGrantError error
+	refuseRevoke  bool
 }
 
 func (f *fakeUpstream) ReplayDomain() string { return f.domain }
@@ -60,15 +63,25 @@ func (f *fakeUpstream) CreateGrant(_ context.Context, source, target, key string
 	return f.grant, nil
 }
 func (f *fakeUpstream) GetGrant(context.Context, string) (peerloom.ControlGrant, error) {
+	if f.getGrantError != nil {
+		return peerloom.ControlGrant{}, f.getGrantError
+	}
 	return f.grant, nil
 }
 func (f *fakeUpstream) RevokeGrant(context.Context, string, string) error {
+	if f.refuseRevoke {
+		return peerloom.ErrOutcomeUnknown
+	}
 	n := time.Now()
 	f.grant.RevokedAt = &n
 	return nil
 }
 func (f *fakeUpstream) GetSession(context.Context, string) (peerloom.ControlSession, error) {
-	return f.session, nil
+	snapshot := f.session
+	if f.afterSession != nil {
+		f.afterSession()
+	}
+	return snapshot, nil
 }
 func (f *fakeUpstream) GetDevice(context.Context, string) (peerloom.ControlDevice, error) {
 	if f.afterDevice != nil {
@@ -324,6 +337,12 @@ func TestNewBootCannotDrainOldRuntime(t *testing.T) {
 	f := &fakeUpstream{domain: "a"}
 	s := testStore(t, f)
 	i, _, e := s.Create(ctx, owner, phone, command(t))
+	if e != nil {
+		t.Fatal(e)
+	}
+	session := command(t)
+	f.session = peerloom.ControlSession{ID: session, TenantID: tenant, SourceDeviceID: pc, TargetDeviceID: phone, GrantID: grantID, State: "connecting", SourceLeaseExpiresAt: time.Now().Add(time.Minute), TargetLeaseExpiresAt: time.Now().Add(time.Minute)}
+	i, e = s.Bind(ctx, mobilePrincipal(), i.ID, command(t), i.Generation, session, runtimeBoot, runtimeProof)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -809,5 +828,126 @@ func TestCreateReplayCannotReviveReboundRelation(t *testing.T) {
 				t.Fatal("replay issued another grant")
 			}
 		})
+	}
+}
+
+func TestNeverBoundReplacedRuntimeRecoversAfterRevoke(t *testing.T) {
+	ctx := context.Background()
+	f := &fakeUpstream{domain: "a"}
+	s := testStore(t, f)
+	key := command(t)
+	i, _, e := s.Create(ctx, owner, phone, key)
+	if e != nil {
+		t.Fatal(e)
+	}
+	// Persist revoked draining first: crash/restart between revoke and recovery.
+	if _, e = s.Close(ctx, owner, i.ID, command(t), "error"); e != nil {
+		t.Fatal(e)
+	}
+	directory, e := catalog.NewStore(s.pool, scope, tenant)
+	if e != nil {
+		t.Fatal(e)
+	}
+	proof := base64.RawURLEncoding.EncodeToString([]byte("01234567890123456789012345678901"))
+	if e = directory.UpdateStatus(ctx, mobilePrincipal(), catalog.Status{BootID: command(t), Sequence: 1, RuntimeProof: proof}); e != nil {
+		t.Fatal(e)
+	}
+	for n := 0; n < 2; n++ {
+		if _, e = s.Recover(ctx, ""); e != nil {
+			t.Fatal(e)
+		}
+	}
+	done, e := s.Get(ctx, owner, i.ID)
+	if e != nil || done.State != "released" || done.Session != "" {
+		t.Fatalf("not safely recovered: %+v %v", done, e)
+	}
+	replay, created, e := s.Create(ctx, owner, phone, key)
+	if e != nil || created || replay.ID != i.ID || replay.State != "released" {
+		t.Fatal("old generation replay revived")
+	}
+	next, _, e := s.Create(ctx, owner, phone, command(t))
+	if e != nil || next.Generation == i.Generation {
+		t.Fatal("new generation blocked", e)
+	}
+	if _, e = s.Bind(ctx, mobilePrincipal(), i.ID, command(t), i.Generation, command(t), runtimeBoot, runtimeProof); e == nil {
+		t.Fatal("late old bind admitted")
+	}
+}
+
+func TestNeverBoundRecoveryFailsClosedWithoutVerifiedGrant(t *testing.T) {
+	for _, mode := range []string{"unavailable", "unrevoked", "foreign"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx := context.Background()
+			f := &fakeUpstream{domain: "a"}
+			s := testStore(t, f)
+			i, _, e := s.Create(ctx, owner, phone, command(t))
+			if e != nil {
+				t.Fatal(e)
+			}
+			directory, e := catalog.NewStore(s.pool, scope, tenant)
+			if e != nil {
+				t.Fatal(e)
+			}
+			if e = directory.UpdateStatus(ctx, mobilePrincipal(), catalog.Status{BootID: command(t), Sequence: 1, RuntimeProof: runtimeProof}); e != nil {
+				t.Fatal(e)
+			}
+			switch mode {
+			case "unavailable":
+				f.getGrantError = identity.ErrUnavailable
+			case "unrevoked":
+				f.refuseRevoke = true
+			case "foreign":
+				f.grant.TargetDeviceID = pc
+			}
+			if _, e = s.Recover(ctx, ""); e == nil {
+				t.Fatal("missing upstream error")
+			}
+			current, e := s.Current(ctx, mobilePrincipal())
+			if e != nil || current == nil || current.ID != i.ID || current.State != "draining" {
+				t.Fatalf("unsafe release %+v %v", current, e)
+			}
+		})
+	}
+}
+
+func TestInFlightBindCannotCrossCloseAndUnboundRecovery(t *testing.T) {
+	ctx := context.Background()
+	f := &fakeUpstream{domain: "a"}
+	s := testStore(t, f)
+	i, _, e := s.Create(ctx, owner, phone, command(t))
+	if e != nil {
+		t.Fatal(e)
+	}
+	session := command(t)
+	f.session = peerloom.ControlSession{ID: session, TenantID: tenant, SourceDeviceID: pc, TargetDeviceID: phone, GrantID: grantID, State: "connecting", SourceLeaseExpiresAt: time.Now().Add(time.Minute), TargetLeaseExpiresAt: time.Now().Add(time.Minute)}
+	arrived := make(chan struct{})
+	resume := make(chan struct{})
+	done := make(chan error, 1)
+	f.afterSession = func() { close(arrived); <-resume }
+	go func() {
+		_, e := s.Bind(ctx, mobilePrincipal(), i.ID, command(t), i.Generation, session, runtimeBoot, runtimeProof)
+		done <- e
+	}()
+	<-arrived
+	if _, e = s.Close(ctx, owner, i.ID, command(t), "error"); e != nil {
+		t.Fatal(e)
+	}
+	close(resume)
+	if e = <-done; e == nil {
+		t.Fatal("inflight bind crossed closing fence")
+	}
+	directory, e := catalog.NewStore(s.pool, scope, tenant)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = directory.UpdateStatus(ctx, mobilePrincipal(), catalog.Status{BootID: command(t), Sequence: 1, RuntimeProof: runtimeProof}); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.Recover(ctx, ""); e != nil {
+		t.Fatal(e)
+	}
+	final, e := s.Get(ctx, owner, i.ID)
+	if e != nil || final.State != "released" || final.Session != "" || !final.revoked {
+		t.Fatalf("unsafe recovery %+v %v", final, e)
 	}
 }
