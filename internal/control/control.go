@@ -54,6 +54,7 @@ type Intent struct {
 	Session                             string `json:"session_id,omitempty"`
 	DrainToken                          string `json:"drain_token,omitempty"`
 	CloseReason                         string `json:"close_reason,omitempty"`
+	PreviousBootID                      string `json:"previous_boot_id,omitempty"`
 	grant, createKey, revokeKey, domain string
 	runtimeBoot                         string
 	runtimeHash                         []byte
@@ -139,6 +140,9 @@ func (s *Store) load(ctx context.Context, tx pgx.Tx, id string) (Intent, error) 
 func visible(i Intent, p identity.Principal) Intent {
 	if p.Role != identity.Mobile {
 		i.DrainToken = ""
+		i.PreviousBootID = ""
+	} else {
+		i.PreviousBootID = i.runtimeBoot
 	}
 	return i
 }
@@ -780,6 +784,104 @@ func (s *Store) Drained(ctx context.Context, p identity.Principal, id, key, gen,
 	}
 	return s.Get(ctx, p, id)
 }
+
+// Recovered acknowledges local executor retirement by a newly registered runtime.
+// It does not assert that effects already submitted to Android have completed.
+// Normal same-runtime closure remains on Drained; no old runtime proof is reused.
+func (s *Store) Recovered(ctx context.Context, p identity.Principal, id, key, gen, session, token, boot, proof string) (Intent, error) {
+	p, e := s.principal(p)
+	if e != nil {
+		return Intent{}, e
+	}
+	if p.Role != identity.Mobile {
+		return Intent{}, identity.ErrForbidden
+	}
+	id, e = canonical(id)
+	if e != nil {
+		return Intent{}, e
+	}
+	key, e = canonical(key)
+	if e != nil {
+		return Intent{}, e
+	}
+	token, e = canonical(token)
+	if e != nil {
+		return Intent{}, e
+	}
+	session, e = canonical(session)
+	if e != nil {
+		return Intent{}, e
+	}
+	if e = generation(gen); e != nil {
+		return Intent{}, e
+	}
+	tx, e := s.begin(ctx)
+	if e != nil {
+		return Intent{}, e
+	}
+	defer tx.Rollback(ctx)
+	i, e := s.load(ctx, tx, id)
+	if e != nil {
+		return i, e
+	}
+	if !allowed(i, p) {
+		return Intent{}, fail("INTENT_NOT_FOUND", 404)
+	}
+	body := []string{id, gen, session, token, boot, proof}
+	old, found, e := s.replay(ctx, tx, p, "recovered", key, body)
+	if found || e != nil {
+		return visible(old, p), e
+	}
+	if e = s.recoveryRuntime(ctx, tx, i, boot, proof); e != nil {
+		return Intent{}, e
+	}
+	if i.Generation != gen {
+		return Intent{}, fail("STALE_GENERATION", 409)
+	}
+	if i.State != "draining" || i.Session == "" || !i.revoked || i.grant == "" || i.DrainToken == "" || i.DrainToken != token {
+		return Intent{}, fail("DRAIN_NOT_READY", 409)
+	}
+	if i.Session != session {
+		return Intent{}, fail("SESSION_MISMATCH", 409)
+	}
+	if e = bump(i); e != nil {
+		return Intent{}, e
+	}
+	if e = s.record(ctx, tx, p, "recovered", key, body, id); e != nil {
+		return Intent{}, e
+	}
+	if e = s.finish(ctx, tx, id, "released"); e != nil {
+		return Intent{}, e
+	}
+	if e = tx.Commit(ctx); e != nil {
+		return Intent{}, e
+	}
+	return s.Get(ctx, p, id)
+}
+
+// recoveryRuntime pins the current catalog row until the release transaction commits.
+// A status update cannot replace the confirming runtime between this check and finish.
+func (s *Store) recoveryRuntime(ctx context.Context, tx pgx.Tx, i Intent, boot, proof string) error {
+	boot, e := canonical(boot)
+	if e != nil {
+		return e
+	}
+	h, ok := catalog.RuntimeProofHash(proof)
+	if !ok {
+		return fail("INVALID_INPUT", 400)
+	}
+	if boot == i.runtimeBoot {
+		return fail("RUNTIME_MISMATCH", 409)
+	}
+	var current string
+	var stored []byte
+	e = tx.QueryRow(ctx, `SELECT boot_id::text,runtime_proof_hash FROM qm_device_catalog WHERE service_scope=$1 AND device_uuid=$2 AND boot_id IS NOT NULL FOR SHARE`, s.scope, i.Target).Scan(&current, &stored)
+	if e != nil || current != boot || subtle.ConstantTimeCompare(stored, h) != 1 {
+		return fail("RUNTIME_MISMATCH", 409)
+	}
+	return nil
+}
+
 func (s *Store) progressDrain(ctx context.Context, id string) error {
 	tx, e := s.begin(ctx)
 	if e != nil {

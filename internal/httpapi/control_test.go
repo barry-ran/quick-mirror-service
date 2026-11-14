@@ -60,6 +60,12 @@ func (f *controlFake) Drained(_ context.Context, _ identity.Principal, _, _, _, 
 	i.State = "released"
 	return i, nil
 }
+func (f *controlFake) Recovered(_ context.Context, _ identity.Principal, _, _, _, _, _, _, proof string) (control.Intent, error) {
+	f.proof = proof
+	i := f.value("recovered")
+	i.State = "released"
+	return i, nil
+}
 func TestControlHTTPRoutesAndProofRedaction(t *testing.T) {
 	f := &controlFake{}
 	h, e := NewControlHandler(controlAccess{}, f, 2)
@@ -77,6 +83,7 @@ func TestControlHTTPRoutesAndProofRedaction(t *testing.T) {
 		{"POST", "/qm/v1/session-intents/id/close", `{"command_id":"key","reason":"user_pc"}`, "close", 202},
 		{"POST", "/qm/v1/device-self/session-intents/id/bind", `{"command_id":"key","business_generation":"1","session_id":"s","boot_id":"b","runtime_proof":"secret-proof"}`, "bind", 200},
 		{"POST", "/qm/v1/device-self/session-intents/id/drained", `{"command_id":"key","business_generation":"1","drain_token":"d","boot_id":"b","runtime_proof":"secret-proof"}`, "drained", 200},
+		{"POST", "/qm/v1/device-self/session-intents/id/recovered", `{"command_id":"key","business_generation":"1","session_id":"s","drain_token":"d","boot_id":"b","runtime_proof":"secret-proof"}`, "recovered", 200},
 	}
 	for _, c := range cases {
 		r := httptest.NewRequest(c.method, c.path, strings.NewReader(c.body))

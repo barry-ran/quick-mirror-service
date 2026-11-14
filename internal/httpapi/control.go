@@ -26,6 +26,7 @@ type ControlIntents interface {
 	Close(context.Context, identity.Principal, string, string, string) (control.Intent, error)
 	Bind(context.Context, identity.Principal, string, string, string, string, string, string) (control.Intent, error)
 	Drained(context.Context, identity.Principal, string, string, string, string, string, string, string) (control.Intent, error)
+	Recovered(context.Context, identity.Principal, string, string, string, string, string, string, string) (control.Intent, error)
 }
 type ControlHandler struct {
 	access identity.Verifier
@@ -118,7 +119,7 @@ func (h *ControlHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		action = "close"
 		id = parts[1]
 		method = http.MethodPost
-	case len(parts) == 4 && parts[0] == "device-self" && parts[1] == "session-intents" && (parts[3] == "bind" || parts[3] == "drained"):
+	case len(parts) == 4 && parts[0] == "device-self" && parts[1] == "session-intents" && (parts[3] == "bind" || parts[3] == "drained" || parts[3] == "recovered"):
 		action = parts[3]
 		id = parts[2]
 		method = http.MethodPost
@@ -211,7 +212,7 @@ func (h *ControlHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if e == nil {
 			i, e = h.store.Bind(ctx, p, id, v.Command, v.Generation, v.Session, v.Boot, v.Proof)
 		}
-	case "drained":
+	case "drained", "recovered":
 		var v struct {
 			Command    string `json:"command_id"`
 			Generation string `json:"business_generation"`
@@ -222,7 +223,11 @@ func (h *ControlHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		e = decode(&v)
 		if e == nil {
-			i, e = h.store.Drained(ctx, p, id, v.Command, v.Generation, v.Session, v.Token, v.Boot, v.Proof)
+			if action == "recovered" {
+				i, e = h.store.Recovered(ctx, p, id, v.Command, v.Generation, v.Session, v.Token, v.Boot, v.Proof)
+			} else {
+				i, e = h.store.Drained(ctx, p, id, v.Command, v.Generation, v.Session, v.Token, v.Boot, v.Proof)
+			}
 		}
 	}
 	if e != nil {

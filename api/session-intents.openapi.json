@@ -417,6 +417,75 @@
           }
         }
       }
+    },
+    "/qm/v1/device-self/session-intents/{intent_id}/recovered": {
+      "post": {
+        "summary": "新运行时确认旧控制执行器已退役",
+        "description": "仅目标手机当前已注册的新 boot/proof 可提交；旧 generation/session/drain_token 必须匹配且 grant 已撤销。释放旧槽，不声称已提交 Android 的副作用完成。正常同运行时关闭仍用 drained。",
+        "operationId": "recoverIntent",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/HTTP200"
+          },
+          "202": {
+            "$ref": "#/components/responses/HTTP202"
+          },
+          "400": {
+            "$ref": "#/components/responses/HTTP400"
+          },
+          "401": {
+            "$ref": "#/components/responses/HTTP401"
+          },
+          "403": {
+            "$ref": "#/components/responses/HTTP403"
+          },
+          "404": {
+            "$ref": "#/components/responses/HTTP404"
+          },
+          "409": {
+            "$ref": "#/components/responses/HTTP409"
+          },
+          "410": {
+            "$ref": "#/components/responses/HTTP410"
+          },
+          "429": {
+            "$ref": "#/components/responses/HTTP429"
+          },
+          "503": {
+            "$ref": "#/components/responses/HTTP503"
+          },
+          "405": {
+            "$ref": "#/components/responses/HTTP405"
+          },
+          "413": {
+            "$ref": "#/components/responses/HTTP413"
+          },
+          "415": {
+            "$ref": "#/components/responses/HTTP415"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecoveredRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "intent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -628,6 +697,11 @@
             "type": "string",
             "pattern": "^[1-9][0-9]{0,18}$",
             "x-maximum-decimal": "9223372036854775807"
+          },
+          "previous_boot_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "仅 mobile 可见的原意图运行时 boot；用于区分新运行时恢复，不是 OS 进程或触点完成证明。"
           }
         },
         "required": [
@@ -725,6 +799,49 @@
         "required": [
           "request_id",
           "error"
+        ]
+      },
+      "RecoveredRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "business_generation": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "业务代次，正十进制字符串；数值最大9223372036854775807，解析/增加溢出失败关闭，不回绕。",
+            "x-maximum-decimal": "9223372036854775807"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "仅已有绑定时必须提供并严格匹配；未绑定时必须省略，不能伪造会话。"
+          },
+          "drain_token": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "boot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "runtime_proof": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "writeOnly": true,
+            "description": "32字节随机base64url无padding，只在控制运行时内存保留；不得日志/回显/安装持久化。"
+          }
+        },
+        "required": [
+          "command_id",
+          "business_generation",
+          "drain_token",
+          "boot_id",
+          "runtime_proof",
+          "session_id"
         ]
       }
     },
