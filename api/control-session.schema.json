@@ -89,7 +89,10 @@
             "script.stop_all",
             "script.status",
             "wallpaper.set_number",
-            "navigation.v1"
+            "navigation.v1",
+            "file.prepare",
+            "file.commit",
+            "file.cancel"
           ]
         },
         "params": {
@@ -507,6 +510,101 @@
                   "profile",
                   "media_generation",
                   "action"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "file.prepare"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "command_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "size": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4294967296
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  }
+                },
+                "required": [
+                  "command_id",
+                  "size",
+                  "sha256",
+                  "path"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "file.commit"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "upload_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "upload_id"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "file.cancel"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "upload_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "upload_id"
                 ]
               }
             }
@@ -983,6 +1081,91 @@
           "$ref": "#/$defs/navigationCapability"
         }
       }
+    },
+    "uploadPrepareResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "upload_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "stream_label": {
+          "type": "string",
+          "pattern": "^qm\\.v1\\.upload\\.[0-9a-f-]{36}$"
+        }
+      },
+      "required": [
+        "upload_id",
+        "stream_label"
+      ]
+    },
+    "fileCommitResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "path"
+      ]
+    },
+    "uploadCancelResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cancelled": {
+          "const": true
+        }
+      },
+      "required": [
+        "cancelled"
+      ]
+    },
+    "scriptCommitResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "artifact_id"
+      ]
+    },
+    "scriptStartResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "STARTING",
+            "RUNNING",
+            "COMPLETED",
+            "FAILED",
+            "STOPPED",
+            "STOPPING",
+            "UNKNOWN",
+            "NOT_STARTED",
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "required": [
+        "task_id",
+        "state"
+      ]
     }
   }
 }
