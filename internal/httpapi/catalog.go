@@ -129,6 +129,9 @@ func (h *CatalogHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var status catalog.Status
 	err = decodeStrictObject(r.Body, &status)
 	if err == nil {
+		err = status.ValidateNavigationActions()
+	}
+	if err == nil {
 		err = h.directory.UpdateStatus(ctx, principal, status)
 	}
 	data = map[string]any{"accepted": true}
@@ -171,6 +174,25 @@ func decodeStrictObject(reader io.Reader, target any) error {
 	}
 	if _, err := decoder.Token(); err != io.EOF {
 		return catalog.ErrInvalidInput
+	}
+	// actions 是可省略但不可为 null 的导航能力数组。
+	if _, ok := target.(*catalog.Status); ok {
+		var fields struct {
+			Capabilities map[string]map[string]json.RawMessage `json:"capabilities"`
+		}
+		if json.Unmarshal(data, &fields) != nil {
+			return catalog.ErrInvalidInput
+		}
+		for _, capability := range fields.Capabilities {
+			for key := range capability {
+				if strings.EqualFold(key, "actions") && key != "actions" {
+					return catalog.ErrInvalidInput
+				}
+			}
+			if raw, present := capability["actions"]; present && bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+				return catalog.ErrInvalidInput
+			}
+		}
 	}
 	decoder = json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()

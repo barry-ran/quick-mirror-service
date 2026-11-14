@@ -81,6 +81,11 @@
             "maxProperties": 64,
             "additionalProperties": {
               "$ref": "#/components/schemas/Capability"
+            },
+            "properties": {
+              "navigation_v1": {
+                "$ref": "#/components/schemas/NavigationCapability"
+              }
             }
           },
           "runtime_proof": {
@@ -122,6 +127,39 @@
               "retry_after_ms": {
                 "type": "integer"
               }
+            }
+          }
+        }
+      },
+      "NavigationCapability": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "supported": {
+            "type": "boolean",
+            "default": false
+          },
+          "available": {
+            "type": "boolean",
+            "default": false
+          },
+          "reason": {
+            "type": "string",
+            "description": "最多256 UTF-8字节；available=true要求supported=true"
+          },
+          "actions": {
+            "type": "array",
+            "maxItems": 6,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "back",
+                "home",
+                "recents",
+                "volume_up",
+                "volume_down",
+                "notifications"
+              ]
             }
           }
         }

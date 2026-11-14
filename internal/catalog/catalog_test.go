@@ -1,6 +1,8 @@
 package catalog
 
 import (
+	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -31,5 +33,27 @@ func TestStatusValidation(t *testing.T) {
 				t.Fatal("invalid status accepted")
 			}
 		})
+	}
+}
+
+func TestNavigationActionsStorageRoundTrip(t *testing.T) {
+	actions := NavigationActions{"back", "home", "recents", "volume_up", "volume_down", "notifications"}
+	original := map[string]Capability{"navigation_v1": {Supported: true, Available: true, Actions: &actions}, "touch": {Supported: true}}
+	encoded, err := encodeCapabilities(original)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded map[string]Capability
+	if err = json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(original, decoded) {
+		t.Fatal("catalog JSON storage/list lost actions")
+	}
+	for _, name := range []string{"navigation_v1", "touch"} {
+		status := Status{BootID: "11111111-1111-4111-8111-111111111111", Sequence: 1, Capabilities: map[string]Capability{name: {Actions: &actions}}}
+		if (status.validate() == nil) != (name == "navigation_v1") {
+			t.Fatal("navigation-only validation failed")
+		}
 	}
 }

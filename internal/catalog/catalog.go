@@ -26,10 +26,31 @@ type Permissions struct {
 	IME           bool `json:"ime"`
 }
 
+// NavigationActions 保留缺省与显式空列表的区别，拒绝 null 和非字符串元素。
+type NavigationActions []string
+
+func (a *NavigationActions) UnmarshalJSON(data []byte) error {
+	var raw []json.RawMessage
+	if string(data) == "null" || json.Unmarshal(data, &raw) != nil || raw == nil {
+		return ErrInvalidInput
+	}
+	result := make(NavigationActions, 0, len(raw))
+	for _, item := range raw {
+		var action string
+		if string(item) == "null" || json.Unmarshal(item, &action) != nil {
+			return ErrInvalidInput
+		}
+		result = append(result, action)
+	}
+	*a = result
+	return nil
+}
+
 type Capability struct {
-	Supported bool   `json:"supported"`
-	Available bool   `json:"available"`
-	Reason    string `json:"reason,omitempty"`
+	Supported bool               `json:"supported"`
+	Available bool               `json:"available"`
+	Reason    string             `json:"reason,omitempty"`
+	Actions   *NavigationActions `json:"actions,omitempty"`
 }
 
 type Status struct {
@@ -71,6 +92,30 @@ func (s Status) validate() error {
 	for name, capability := range s.Capabilities {
 		if name == "" || len(name) > 64 || !utf8.ValidString(name) || strings.ContainsRune(name, 0) || !utf8.ValidString(capability.Reason) || len(capability.Reason) > 256 || strings.ContainsRune(capability.Reason, 0) || (capability.Available && !capability.Supported) {
 			return ErrInvalidInput
+		}
+	}
+	return s.ValidateNavigationActions()
+}
+
+func (s Status) ValidateNavigationActions() error {
+	for name, c := range s.Capabilities {
+		if c.Actions == nil {
+			continue
+		}
+		if name != "navigation_v1" || len(*c.Actions) > 6 {
+			return ErrInvalidInput
+		}
+		seen := map[string]bool{}
+		for _, action := range *c.Actions {
+			switch action {
+			case "back", "home", "recents", "volume_up", "volume_down", "notifications":
+			default:
+				return ErrInvalidInput
+			}
+			if seen[action] {
+				return ErrInvalidInput
+			}
+			seen[action] = true
 		}
 	}
 	return nil
