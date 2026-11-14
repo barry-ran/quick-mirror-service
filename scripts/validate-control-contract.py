@@ -5,7 +5,7 @@ from pathlib import Path
 from jsonschema import Draft202012Validator, FormatChecker, ValidationError, validators
 
 ROOT = Path(__file__).resolve().parents[1]
-schema = json.loads((ROOT / 'api/control-session.schema.json').read_text())
+schema = json.loads((ROOT / 'api/control-session.schema.json').read_text(encoding='utf-8'))
 
 def decimal_limit(validator, maximum, value, subschema):
     if isinstance(value, str) and value.isascii() and value.isdecimal() and int(value) > int(maximum):
@@ -28,7 +28,7 @@ def check_refs(node):
             check_refs(value)
 
 check_refs(schema)
-fixtures = json.loads((ROOT / 'api/fixtures/control-session.json').read_text())
+fixtures = json.loads((ROOT / 'api/fixtures/control-session.json').read_text(encoding='utf-8'))
 cases = fixtures['cases']
 for case in cases:
     target = schema if 'definition' not in case else {'$ref': '#/$defs/' + case['definition'], '$defs': schema['$defs']}
@@ -55,3 +55,10 @@ assert {case['id'] for case in timelines} == expected_timelines
 assert len(timelines) == len(expected_timelines)
 assert all(case['steps'] and case['expect'] and all(isinstance(v, str) for v in case['steps'] + case['expect']) for case in timelines)
 print('7个时序契约仅检查结构/存在性；未执行状态机、资源排空或真机行为。')
+
+# 固定六项覆盖，防止请求枚举与 capability 枚举同步时漏项。
+navigation_actions = {'back', 'home', 'recents', 'volume_up', 'volume_down', 'notifications'}
+assert {case['message']['params']['action'] for case in cases
+        if case['valid'] and case['message'].get('op') == 'navigation.v1'} == navigation_actions
+assert set(schema['$defs']['navigationCapability']['properties']['actions']['items']['enum']) == navigation_actions
+print('navigation.v1 六项请求、能力兼容/拒绝与 API 接纳结果结构校验通过；不代表真机执行验收。')

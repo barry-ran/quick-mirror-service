@@ -355,6 +355,487 @@
         },
         "running_script": []
       }
+    },
+    {
+      "name": "navigation.v1:back",
+      "valid": true,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "7",
+        "kind": "request",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "op": "navigation.v1",
+        "params": {
+          "profile": "accessibility-navigation-v1",
+          "media_generation": "1",
+          "action": "back"
+        }
+      }
+    },
+    {
+      "name": "navigation.v1:home",
+      "valid": true,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "7",
+        "kind": "request",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "op": "navigation.v1",
+        "params": {
+          "profile": "accessibility-navigation-v1",
+          "media_generation": "1",
+          "action": "home"
+        }
+      }
+    },
+    {
+      "name": "navigation.v1:recents",
+      "valid": true,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "7",
+        "kind": "request",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "op": "navigation.v1",
+        "params": {
+          "profile": "accessibility-navigation-v1",
+          "media_generation": "1",
+          "action": "recents"
+        }
+      }
+    },
+    {
+      "name": "navigation.v1:volume_up",
+      "valid": true,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "7",
+        "kind": "request",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "op": "navigation.v1",
+        "params": {
+          "profile": "accessibility-navigation-v1",
+          "media_generation": "1",
+          "action": "volume_up"
+        }
+      }
+    },
+    {
+      "name": "navigation.v1:volume_down",
+      "valid": true,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "7",
+        "kind": "request",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "op": "navigation.v1",
+        "params": {
+          "profile": "accessibility-navigation-v1",
+          "media_generation": "1",
+          "action": "volume_down"
+        }
+      }
+    },
+    {
+      "name": "navigation.v1:notifications",
+      "valid": true,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "7",
+        "kind": "request",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "op": "navigation.v1",
+        "params": {
+          "profile": "accessibility-navigation-v1",
+          "media_generation": "1",
+          "action": "notifications"
+        }
+      }
+    },
+    {
+      "name": "navigation.v1:reject-unknown-action",
+      "valid": false,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "7",
+        "kind": "request",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "op": "navigation.v1",
+        "params": {
+          "profile": "accessibility-navigation-v1",
+          "media_generation": "1",
+          "action": "power"
+        }
+      }
+    },
+    {
+      "name": "navigation.v1:reject-wrong-profile",
+      "valid": false,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "7",
+        "kind": "request",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "op": "navigation.v1",
+        "params": {
+          "profile": "navigation-v2",
+          "media_generation": "1",
+          "action": "home"
+        }
+      }
+    },
+    {
+      "name": "navigation.v1:reject-numeric-generation",
+      "valid": false,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "7",
+        "kind": "request",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "op": "navigation.v1",
+        "params": {
+          "profile": "accessibility-navigation-v1",
+          "media_generation": 1,
+          "action": "home"
+        }
+      }
+    },
+    {
+      "name": "navigation.v1:reject-zero-generation",
+      "valid": false,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "7",
+        "kind": "request",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "op": "navigation.v1",
+        "params": {
+          "profile": "accessibility-navigation-v1",
+          "media_generation": "0",
+          "action": "home"
+        }
+      }
+    },
+    {
+      "name": "navigation.v1:reject-overflow-generation",
+      "valid": false,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "7",
+        "kind": "request",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "op": "navigation.v1",
+        "params": {
+          "profile": "accessibility-navigation-v1",
+          "media_generation": "9223372036854775808",
+          "action": "home"
+        }
+      }
+    },
+    {
+      "name": "navigation.v1:reject-extra-field",
+      "valid": false,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "7",
+        "kind": "request",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "op": "navigation.v1",
+        "params": {
+          "profile": "accessibility-navigation-v1",
+          "media_generation": "1",
+          "action": "home",
+          "keycode": 3
+        }
+      }
+    },
+    {
+      "name": "navigation.v1:missing-profile",
+      "valid": false,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "7",
+        "kind": "request",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "op": "navigation.v1",
+        "params": {
+          "media_generation": "1",
+          "action": "home"
+        }
+      }
+    },
+    {
+      "name": "navigation.v1:missing-media_generation",
+      "valid": false,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "7",
+        "kind": "request",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "op": "navigation.v1",
+        "params": {
+          "profile": "accessibility-navigation-v1",
+          "action": "home"
+        }
+      }
+    },
+    {
+      "name": "navigation.v1:missing-action",
+      "valid": false,
+      "message": {
+        "v": 1,
+        "session_id": "11111111-1111-4111-8111-111111111111",
+        "intent_id": "22222222-2222-4222-8222-222222222222",
+        "business_generation": "7",
+        "kind": "request",
+        "request_id": "33333333-3333-4333-8333-333333333333",
+        "op": "navigation.v1",
+        "params": {
+          "profile": "accessibility-navigation-v1",
+          "media_generation": "1"
+        }
+      }
+    },
+    {
+      "name": "navigation-capability:six-actions",
+      "valid": true,
+      "message": {
+        "supported": true,
+        "available": true,
+        "actions": [
+          "back",
+          "home",
+          "recents",
+          "volume_up",
+          "volume_down",
+          "notifications"
+        ]
+      },
+      "definition": "navigationCapability"
+    },
+    {
+      "name": "navigation-capability:legacy-no-actions",
+      "valid": true,
+      "message": {
+        "supported": true,
+        "available": true
+      },
+      "definition": "navigationCapability"
+    },
+    {
+      "name": "navigation-capability:empty-actions",
+      "valid": true,
+      "message": {
+        "supported": true,
+        "available": true,
+        "actions": []
+      },
+      "definition": "navigationCapability"
+    },
+    {
+      "name": "navigation-capability:reject-duplicate",
+      "valid": false,
+      "message": {
+        "supported": true,
+        "available": true,
+        "actions": [
+          "home",
+          "home"
+        ]
+      },
+      "definition": "navigationCapability"
+    },
+    {
+      "name": "navigation-capability:reject-unknown",
+      "valid": false,
+      "message": {
+        "supported": true,
+        "available": true,
+        "actions": [
+          "power"
+        ]
+      },
+      "definition": "navigationCapability"
+    },
+    {
+      "name": "navigation-capability:reject-too-many",
+      "valid": false,
+      "message": {
+        "supported": true,
+        "available": true,
+        "actions": [
+          "back",
+          "home",
+          "recents",
+          "volume_up",
+          "volume_down",
+          "notifications",
+          "home"
+        ]
+      },
+      "definition": "navigationCapability"
+    },
+    {
+      "name": "navigation-capability:reject-not-array",
+      "valid": false,
+      "message": {
+        "supported": true,
+        "available": true,
+        "actions": "home"
+      },
+      "definition": "navigationCapability"
+    },
+    {
+      "name": "other-capability:reject-actions",
+      "valid": false,
+      "message": {
+        "supported": true,
+        "available": true,
+        "actions": [
+          "back",
+          "home",
+          "recents",
+          "volume_up",
+          "volume_down",
+          "notifications"
+        ]
+      },
+      "definition": "capability"
+    },
+    {
+      "name": "navigation-result:accepted",
+      "valid": true,
+      "message": {
+        "api_accepted": true
+      },
+      "definition": "navigationResult"
+    },
+    {
+      "name": "navigation-result:reject-false",
+      "valid": false,
+      "message": {
+        "api_accepted": false
+      },
+      "definition": "navigationResult"
+    },
+    {
+      "name": "navigation-result:reject-success-claim",
+      "valid": false,
+      "message": {
+        "api_accepted": true,
+        "executed": true
+      },
+      "definition": "navigationResult"
+    },
+    {
+      "name": "navigation-state:six-actions",
+      "definition": "stateResult",
+      "message": {
+        "permissions": {
+          "projection": false,
+          "accessibility": true,
+          "ime": false
+        },
+        "capabilities": {
+          "navigation_v1": {
+            "supported": true,
+            "available": true,
+            "actions": [
+              "back",
+              "home",
+              "recents",
+              "volume_up",
+              "volume_down",
+              "notifications"
+            ]
+          }
+        },
+        "capture": "missing",
+        "capture_geometry": null,
+        "running_script": []
+      },
+      "valid": true
+    },
+    {
+      "name": "navigation-state:unknown",
+      "definition": "stateResult",
+      "message": {
+        "permissions": {
+          "projection": false,
+          "accessibility": true,
+          "ime": false
+        },
+        "capabilities": {
+          "navigation_v1": {
+            "supported": true,
+            "available": true,
+            "actions": [
+              "power"
+            ]
+          }
+        },
+        "capture": "missing",
+        "capture_geometry": null,
+        "running_script": []
+      },
+      "valid": false
+    },
+    {
+      "name": "navigation-state:other-capability",
+      "definition": "stateResult",
+      "message": {
+        "permissions": {
+          "projection": false,
+          "accessibility": true,
+          "ime": false
+        },
+        "capabilities": {
+          "touch": {
+            "supported": true,
+            "available": true,
+            "actions": [
+              "back",
+              "home",
+              "recents",
+              "volume_up",
+              "volume_down",
+              "notifications"
+            ]
+          }
+        },
+        "capture": "missing",
+        "capture_geometry": null,
+        "running_script": []
+      },
+      "valid": false
     }
   ],
   "attach_cases": [

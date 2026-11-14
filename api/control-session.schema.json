@@ -88,7 +88,8 @@
             "script.stop",
             "script.stop_all",
             "script.status",
-            "wallpaper.set_number"
+            "wallpaper.set_number",
+            "navigation.v1"
           ]
         },
         "params": {
@@ -470,6 +471,46 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "navigation.v1"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "profile": {
+                    "const": "accessibility-navigation-v1"
+                  },
+                  "media_generation": {
+                    "$ref": "#/$defs/generation"
+                  },
+                  "action": {
+                    "enum": [
+                      "home",
+                      "back",
+                      "recents",
+                      "volume_up",
+                      "volume_down",
+                      "notifications"
+                    ]
+                  }
+                },
+                "required": [
+                  "profile",
+                  "media_generation",
+                  "action"
+                ]
+              }
+            }
+          }
         }
       ]
     },
@@ -707,6 +748,11 @@
           "maxProperties": 64,
           "additionalProperties": {
             "$ref": "#/$defs/capability"
+          },
+          "properties": {
+            "navigation_v1": {
+              "$ref": "#/$defs/navigationCapability"
+            }
           }
         },
         "capture": {
@@ -891,6 +937,52 @@
       "required": [
         "media_generation",
         "state"
+      ]
+    },
+    "navigationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "api_accepted": {
+          "const": true
+        }
+      },
+      "required": [
+        "api_accepted"
+      ]
+    },
+    "navigationCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "supported": {
+          "type": "boolean"
+        },
+        "available": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "actions": {
+          "type": "array",
+          "maxItems": 6,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "back",
+              "home",
+              "recents",
+              "volume_up",
+              "volume_down",
+              "notifications"
+            ]
+          }
+        }
+      },
+      "required": [
+        "supported",
+        "available"
       ]
     }
   }
