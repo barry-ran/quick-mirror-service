@@ -1,0 +1,52 @@
+// Test-only real Peerloom management subsystem; never used in a production image.
+package main
+import (
+ "context"
+ "crypto/rand"
+ "encoding/hex"
+ "encoding/json"
+ "encoding/pem"
+ "fmt"
+ "io"
+ "net/http/httptest"
+ "os"
+ "os/signal"
+ "syscall"
+ "path/filepath"
+ "time"
+ "github.com/barry-ran/peerloom/src/device-server/internal/management"
+ "github.com/barry-ran/peerloom/src/device-server/internal/migrate"
+ "github.com/jackc/pgx/v5"
+ "github.com/jackc/pgx/v5/pgxpool"
+)
+func run() error {
+ ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second); defer cancel()
+ url := os.Getenv("QM_TEST_DATABASE_URL")
+ if url == "" { return fmt.Errorf("isolated test database required") }
+ admin, err := pgx.Connect(ctx,url); if err != nil { return err }; defer admin.Close(context.Background())
+ random := make([]byte,16); if _,err=rand.Read(random); err!=nil{return err}
+ schema := "qm_peerloom_renew_" + hex.EncodeToString(random)
+ quoted := pgx.Identifier{schema}.Sanitize()
+ if _,err=admin.Exec(ctx,"CREATE SCHEMA "+quoted);err!=nil{return err}
+ defer func(){ c,done:=context.WithTimeout(context.Background(),10*time.Second);defer done();admin.Exec(c,"DROP SCHEMA "+quoted+" CASCADE") }()
+ config,err:=pgxpool.ParseConfig(url);if err!=nil{return err};config.ConnConfig.RuntimeParams["search_path"]=schema
+ pool,err:=pgxpool.NewWithConfig(ctx,config);if err!=nil{return err};defer pool.Close()
+ ms,err:=migrate.Load(os.Args[1]);if err!=nil{return err}
+ if err=migrate.Apply(ctx,pool,ms,"up");err!=nil{return err}
+ key:=make([]byte,32);if _,err=rand.Read(key);err!=nil{return err}
+ service,err:=management.New(pool,key,management.DefaultSettings());if err!=nil{return err}
+ setup,err:=management.SetupEmpty(ctx,pool,"runtime-fixture","qm-runtime",30*24*time.Hour,func(management.SetupResult)error{return nil});if err!=nil{return err}
+ server:=httptest.NewTLSServer(management.NewHandler(service));defer server.Close()
+ output:=os.Args[2]
+ credential,err:=json.Marshal(setup);if err!=nil{return err}
+ if err=os.WriteFile(filepath.Join(output,"connection.json"),credential,0600);err!=nil{return err}
+ ca:=pem.EncodeToMemory(&pem.Block{Type:"CERTIFICATE",Bytes:server.Certificate().Raw})
+ if err=os.WriteFile(filepath.Join(output,"ca.pem"),ca,0600);err!=nil{return err}
+ metadata,err:=json.Marshal(map[string]string{"origin":server.URL,"schema":schema,"tenant_id":setup.TenantID,"credential_id":setup.CredentialID,"application_id":setup.ApplicationID})
+ if err!=nil{return err}
+ if err=os.WriteFile(filepath.Join(output,"ready.json"),metadata,0600);err!=nil{return err}
+ stop,done:=signal.NotifyContext(context.Background(),os.Interrupt,syscall.SIGTERM);defer done()
+ closed:=make(chan struct{});go func(){io.Copy(io.Discard,os.Stdin);close(closed)}()
+ select {case <-closed:case <-stop.Done():};return nil
+}
+func main(){ if err:=run();err!=nil{fmt.Fprintln(os.Stderr,"isolated Peerloom management fixture failed");os.Exit(1)} }
