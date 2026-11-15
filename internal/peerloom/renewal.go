@@ -111,7 +111,7 @@ func (c *renewalClient) request(ctx context.Context, secret, operation, path str
 func validServiceInfo(v ServiceCredentialInfo, tenant string) bool {
 	_, a := identity.NormalizeUUID(v.SubjectID)
 	_, b := identity.NormalizeUUID(v.CredentialID)
-	return a && b && v.TenantID == tenant && visibleASCII(v.Scope, 1, 64) && !v.ExpiresAt.IsZero() && !v.RenewAfter.IsZero() && v.RenewAfter.Before(v.ExpiresAt) && !v.EffectiveAcceptUntil.IsZero() && !v.EffectiveAcceptUntil.After(v.ExpiresAt)
+	return a && b && v.TenantID == tenant && (v.Scope == "read" || v.Scope == "admin") && !v.ExpiresAt.IsZero() && !v.RenewAfter.IsZero() && v.RenewAfter.Before(v.ExpiresAt) && !v.EffectiveAcceptUntil.IsZero() && !v.EffectiveAcceptUntil.After(v.ExpiresAt)
 }
 func (c *renewalClient) Self(ctx context.Context, secret string) (ServiceCredentialInfo, error) {
 	var v ServiceCredentialInfo

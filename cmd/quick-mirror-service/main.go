@@ -151,6 +151,9 @@ func serve(ctx context.Context, c config, migrate bool) error {
 			return err
 		}
 		defer credentials.Close()
+		if credentials.ServiceInfo().Scope != "admin" {
+			return errors.New("PEERLOOM_ADMIN_CREDENTIAL_REQUIRED")
+		}
 		c.CredentialSource = credentials
 	}
 	issuer, err := c.registrationClient(c.upstreamClient)

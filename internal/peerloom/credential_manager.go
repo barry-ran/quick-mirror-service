@@ -31,6 +31,7 @@ type managedDocument struct {
 type CredentialManager struct {
 	storage      sync.RWMutex
 	expected     map[[32]byte]bool
+	pending      *managedDocument
 	status       string
 	mu           sync.RWMutex
 	step         sync.Mutex
@@ -210,6 +211,9 @@ func (m *CredentialManager) Step(ctx context.Context) (result error) {
 	if m.unlock == nil {
 		return ErrRenewalRejected
 	}
+	if m.pending != nil {
+		return m.commitSuccessor(ctx, *m.pending)
+	}
 	m.mu.RLock()
 	d := m.doc
 	rejected := m.rejected
@@ -268,13 +272,8 @@ func (m *CredentialManager) Step(ctx context.Context) (result error) {
 		return ErrRenewalRejected
 	}
 	replacement := managedDocument{ServiceCredentialInfo: checked, ServiceCredential: next.ServiceCredential}
-	if err = m.save(replacement); err != nil {
-		return err
-	}
-	m.mu.Lock()
-	m.doc = replacement
-	m.mu.Unlock()
-	return nil
+	m.pending = &replacement
+	return m.commitSuccessor(ctx, replacement)
 }
 
 // Run checks revocation and renewal regularly. Logs contain status codes only, never API bodies.
@@ -375,4 +374,32 @@ func (m *CredentialManager) checkStorage() error {
 		return ErrManagedCredentialStorage
 	}
 	return nil
+}
+
+// A known successor is retried independently of the retiring credential. This also recovers
+// a completed rename followed by a directory fsync error after the old overlap has expired.
+func (m *CredentialManager) commitSuccessor(ctx context.Context, replacement managedDocument) error {
+	verified, err := m.api.Self(ctx, replacement.ServiceCredential)
+	if err != nil {
+		return err
+	}
+	if !validServiceInfo(verified, m.tenant) || verified.SubjectID != replacement.SubjectID || verified.CredentialID != replacement.CredentialID || verified.Scope != replacement.Scope || !m.now().Before(verified.EffectiveAcceptUntil) {
+		return ErrRenewalRejected
+	}
+	replacement.ServiceCredentialInfo = verified
+	if err = m.save(replacement); err != nil {
+		return err
+	}
+	m.mu.Lock()
+	m.doc = replacement
+	m.rejected = false
+	m.mu.Unlock()
+	m.pending = nil
+	return nil
+}
+
+func (m *CredentialManager) ServiceInfo() ServiceCredentialInfo {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.doc.ServiceCredentialInfo
 }

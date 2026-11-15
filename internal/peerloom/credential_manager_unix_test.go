@@ -9,11 +9,12 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestManagedRestartRecoversSameOperation(t *testing.T) {
 	f := renewalFixture()
-	p := filepath.Join(t.TempDir(), "connection.json")
+	p := filepath.Join(privateCredentialDir(t), "connection.json")
 	if err := os.WriteFile(p, []byte("old_secret"), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +53,7 @@ func TestManagedRestartRecoversSameOperation(t *testing.T) {
 }
 func TestManagedDirectoryLockAndPrivateMode(t *testing.T) {
 	f := renewalFixture()
-	dir := t.TempDir()
+	dir := privateCredentialDir(t)
 	p := filepath.Join(dir, "key")
 	_ = os.WriteFile(p, []byte("old_secret"), 0600)
 	m, err := NewCredentialManager(context.Background(), p, renewalTenant, f)
@@ -73,7 +74,7 @@ func TestManagedDirectoryLockAndPrivateMode(t *testing.T) {
 }
 func TestManagedRejectsMismatchedJournal(t *testing.T) {
 	f := renewalFixture()
-	p := filepath.Join(t.TempDir(), "key")
+	p := filepath.Join(privateCredentialDir(t), "key")
 	doc := managedDocument{ServiceCredentialInfo: f.old, ServiceCredential: "old_secret", Operation: renewalNew, OperationCredential: renewalNew, OperationSubject: renewalSubject}
 	b, _ := json.Marshal(doc)
 	_ = os.WriteFile(p, b, 0600)
@@ -84,7 +85,7 @@ func TestManagedRejectsMismatchedJournal(t *testing.T) {
 
 func TestManagedExternalFileChangeFailsClosed(t *testing.T) {
 	f := renewalFixture()
-	p := filepath.Join(t.TempDir(), "key")
+	p := filepath.Join(privateCredentialDir(t), "key")
 	_ = os.WriteFile(p, []byte("old_secret"), 0600)
 	m, err := NewCredentialManager(context.Background(), p, renewalTenant, f)
 	if err != nil {
@@ -115,7 +116,7 @@ func TestManagedExternalFileChangeFailsClosed(t *testing.T) {
 }
 func TestManagedRestartAfterRenameBeforeDirectorySync(t *testing.T) {
 	f := renewalFixture()
-	p := filepath.Join(t.TempDir(), "key")
+	p := filepath.Join(privateCredentialDir(t), "key")
 	_ = os.WriteFile(p, []byte("old_secret"), 0600)
 	m, err := NewCredentialManager(context.Background(), p, renewalTenant, f)
 	if err != nil {
@@ -152,5 +153,50 @@ func TestManagedRestartAfterRenameBeforeDirectorySync(t *testing.T) {
 	}
 	if len(f.ops) != 1 {
 		t.Fatal("restart created another successor")
+	}
+}
+
+func privateCredentialDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.Chmod(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+func TestManagedDurableSuccessorRecoversAfterOldOverlapExpires(t *testing.T) {
+	f := renewalFixture()
+	p := filepath.Join(privateCredentialDir(t), "key")
+	_ = os.WriteFile(p, []byte("old_secret"), 0600)
+	m, err := NewCredentialManager(context.Background(), p, renewalTenant, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m.Close()
+	n := 0
+	m.persist = func(data []byte) error {
+		n++
+		if err := persistCredential(p, data); err != nil {
+			return err
+		}
+		if n == 2 {
+			return errors.New("fixture directory sync failure")
+		}
+		return nil
+	}
+	if err = m.Step(context.Background()); !errors.Is(err, ErrManagedCredentialStorage) {
+		t.Fatal(err)
+	}
+	m.now = func() time.Time { return time.Now().Add(26 * time.Hour) }
+	f.oldInvalid = true
+	if err = m.Step(context.Background()); err != nil {
+		t.Fatal("failed to recover known successor after old key expiry", err)
+	}
+	if got, err := m.Read(); got != "new_secret" || err != nil {
+		t.Fatal("successor not published", err)
+	}
+	if len(f.ops) != 1 || m.Health().Status != "healthy" {
+		t.Fatal("recovery forked or stayed degraded")
 	}
 }

@@ -15,6 +15,7 @@ const renewalOld = "33333333-3333-4333-8333-333333333333"
 const renewalNew = "44444444-4444-4444-8444-444444444444"
 
 type fakeRenewal struct {
+	oldInvalid            bool
 	old, new              ServiceCredentialInfo
 	selfError, renewError error
 	ops                   []string
@@ -36,6 +37,9 @@ func (f *fakeRenewal) Self(_ context.Context, s string) (ServiceCredentialInfo, 
 		return ServiceCredentialInfo{}, f.selfError
 	}
 	if s == "old_secret" {
+		if f.oldInvalid {
+			return ServiceCredentialInfo{}, ErrRenewalRejected
+		}
 		return f.old, nil
 	}
 	if s == "new_secret" {
@@ -114,8 +118,8 @@ func TestManagedPersistenceFailureRetainsOperation(t *testing.T) {
 	if err := m.Step(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if len(f.ops) != 2 || f.ops[0] != f.ops[1] {
-		t.Fatal("retried with a different operation")
+	if len(f.ops) != 1 {
+		t.Fatal("known successor should persist without another renewal call")
 	}
 	if m.Health().Status != "healthy" {
 		t.Fatal("recovery did not clear degradation")
