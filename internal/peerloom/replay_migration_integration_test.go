@@ -4,10 +4,11 @@ package peerloom
 
 import (
 	"context"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestReplayMigrationExactCredentialAndRestart(t *testing.T) {

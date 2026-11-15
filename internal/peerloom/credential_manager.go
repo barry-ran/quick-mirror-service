@@ -7,11 +7,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/barry-ran/quick-mirror-service/internal/identity"
 	"io"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/barry-ran/quick-mirror-service/internal/identity"
 )
 
 var ErrManagedRenewalDisabled = errors.New("PEERLOOM_SERVICE_RENEWAL_DISABLED")
@@ -190,6 +191,8 @@ func operationID() (string, error) {
 
 // Step never abandons a pending operation or switches secrets before durable persistence.
 func (m *CredentialManager) Step(ctx context.Context) (result error) {
+	m.step.Lock()
+	defer m.step.Unlock()
 	defer func() {
 		m.mu.Lock()
 		defer m.mu.Unlock()
@@ -210,8 +213,6 @@ func (m *CredentialManager) Step(ctx context.Context) (result error) {
 			m.status = "journal_invalid"
 		}
 	}()
-	m.step.Lock()
-	defer m.step.Unlock()
 	if m.checkStorage() != nil {
 		return ErrManagedCredentialStorage
 	}
