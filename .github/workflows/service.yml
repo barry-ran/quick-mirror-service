@@ -74,10 +74,10 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: barry-ran/peerloom
-          ref: 2e6f7b95cb46284b1ae1f06f59e54a8a48b7f69e
+          ref: 43bc6b911d03a153949a0c4c3711c6d68c9800fb
           path: .ci-peerloom
           persist-credentials: false
           submodules: false
       - name: Real Peerloom TLS management and QM credential worker
         timeout-minutes: 8
-        run: python3 scripts/test-peerloom-renewal-runtime.py --peerloom .ci-peerloom --commit 2e6f7b95cb46284b1ae1f06f59e54a8a48b7f69e
+        run: python3 scripts/test-peerloom-renewal-runtime.py --peerloom .ci-peerloom --commit 43bc6b911d03a153949a0c4c3711c6d68c9800fb
