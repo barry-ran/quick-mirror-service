@@ -24,7 +24,7 @@ type fakeRenewal struct {
 
 func renewalFixture() *fakeRenewal {
 	now := time.Now()
-	old := ServiceCredentialInfo{renewalSubject, renewalTenant, renewalOld, "admin", now.Add(5 * 24 * time.Hour), now.Add(-time.Hour), now.Add(5 * 24 * time.Hour)}
+	old := ServiceCredentialInfo{true, renewalSubject, renewalTenant, renewalOld, "admin", now.Add(5 * 24 * time.Hour), now.Add(-time.Hour), now.Add(5 * 24 * time.Hour)}
 	n := old
 	n.CredentialID = renewalNew
 	n.ExpiresAt = now.Add(30 * 24 * time.Hour)
@@ -231,5 +231,21 @@ func TestServiceScopeValidation(t *testing.T) {
 	v.Scope = "read"
 	if !validServiceInfo(v, renewalTenant) {
 		t.Fatal("generic read scope rejected")
+	}
+}
+
+func TestManagedDisabledRenewalDoesNotUpgradeLegacyAuthority(t *testing.T) {
+	f := renewalFixture()
+	m := testManager(f)
+	f.old.RenewalEnabled = false
+	if err := m.Step(context.Background()); !errors.Is(err, ErrManagedRenewalDisabled) {
+		t.Fatal(err)
+	}
+	if len(f.ops) != 0 || m.Health().Status != "renewal_disabled" {
+		t.Fatal("disabled subject silently upgraded")
+	}
+	f.old.RenewalEnabled = true
+	if err := m.Step(context.Background()); err != nil {
+		t.Fatal("operator enable not recovered", err)
 	}
 }

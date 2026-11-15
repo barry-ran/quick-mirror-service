@@ -19,6 +19,7 @@ var ErrRenewalUnavailable = errors.New("PEERLOOM_RENEWAL_UNAVAILABLE")
 var ErrRenewalDeferred = errors.New("PEERLOOM_RENEWAL_DEFERRED")
 
 type ServiceCredentialInfo struct {
+	RenewalEnabled       bool      `json:"renewal_enabled"`
 	SubjectID            string    `json:"subject_id"`
 	TenantID             string    `json:"tenant_id"`
 	CredentialID         string    `json:"credential_id"`

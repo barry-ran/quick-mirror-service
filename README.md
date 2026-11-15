@@ -31,6 +31,8 @@ go test -race -tags integration ./internal/...
 
 ## Peerloom 服务凭据自动续期
 
+新 `device-admin setup` 创建的服务主体默认允许自动续期。既有临时/有限期主体不会因升级被自动变成无限可续期：上游 `renewal_enabled=false` 时，QM FILE 托管明确启动失败并提示 `PEERLOOM_SERVICE_RENEWAL_DISABLED`，需要操作员一次性显式启用该主体续期；不会悄悄退回静态模式。
+
 Linux/macOS 服务使用 `QM_PEERLOOM_SERVICE_CREDENTIAL_FILE` 指定绝对路径后，默认托管续期，无需另开开关或每月手动操作。初始文件可直接使用 `device-admin` 生成的 JSON，也接受单行凭据。QM 通过 Peerloom `GET /v1/service-credentials/self` 验证主体、租户、权限及期限，不相信文件中自报的身份元数据；租户和 PC/手机应用映射仍由 QM 的部署配置决定。
 
 目录必须属于服务账号且权限为 `0700`，普通凭据文件为 `0600`，不接受末级符号链接和硬链接。JSON 总长不超过 16 KiB，secret 不超过 512 个可见 ASCII 字符。Docker **可写挂载专用父目录**，不要只挂单文件，也不要只读挂载。该目录同时保存凭据和续期操作标识，进程使用排他文件锁；第二个 writer 会启动失败。运行期间不要手工覆盖此托管文件。首次迁移请运行 `-migrate` 创建幂等域映射表，再启动服务；旧只读挂载必须先改成专用可写私有目录，否则服务明确启动失败。

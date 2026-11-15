@@ -14,6 +14,7 @@ import (
 	"time"
 )
 
+var ErrManagedRenewalDisabled = errors.New("PEERLOOM_SERVICE_RENEWAL_DISABLED")
 var ErrManagedCredentialUnsupported = errors.New("PEERLOOM_MANAGED_CREDENTIAL_UNSUPPORTED")
 var ErrManagedCredentialStorage = errors.New("PEERLOOM_MANAGED_CREDENTIAL_STORAGE_UNAVAILABLE")
 var ErrManagedCredentialJournal = errors.New("PEERLOOM_RENEWAL_JOURNAL_INVALID")
@@ -80,6 +81,9 @@ func NewCredentialManager(ctx context.Context, path, tenant string, api RenewalA
 	info, err := api.Self(ctx, secret)
 	if err != nil {
 		return nil, err
+	}
+	if !info.RenewalEnabled {
+		return nil, ErrManagedRenewalDisabled
 	}
 	if !validServiceInfo(info, tenant) || !time.Now().Before(info.EffectiveAcceptUntil) {
 		return nil, ErrRenewalRejected
@@ -193,6 +197,9 @@ func (m *CredentialManager) Step(ctx context.Context) (result error) {
 		if result != nil {
 			m.status = "renewal_pending"
 		}
+		if errors.Is(result, ErrManagedRenewalDisabled) {
+			m.status = "renewal_disabled"
+		}
 		if errors.Is(result, ErrManagedCredentialStorage) {
 			m.status = "storage_failed"
 		}
@@ -229,6 +236,9 @@ func (m *CredentialManager) Step(ctx context.Context) (result error) {
 			m.mu.Unlock()
 		}
 		return err
+	}
+	if !info.RenewalEnabled {
+		return ErrManagedRenewalDisabled
 	}
 	if !validServiceInfo(info, m.tenant) || info.SubjectID != d.SubjectID || info.CredentialID != d.CredentialID || info.Scope != d.Scope {
 		return ErrRenewalRejected
@@ -288,6 +298,9 @@ func (m *CredentialManager) Run(ctx context.Context, report func(string)) {
 		code := "PEERLOOM_CREDENTIAL_HEALTHY"
 		if err != nil {
 			code = "PEERLOOM_CREDENTIAL_RENEWAL_PENDING"
+			if errors.Is(err, ErrManagedRenewalDisabled) {
+				code = "PEERLOOM_SERVICE_RENEWAL_DISABLED"
+			}
 			failures++
 			if errors.Is(err, ErrRenewalRejected) {
 				code = "PEERLOOM_CREDENTIAL_RENEWAL_REJECTED"
@@ -375,6 +388,9 @@ func (m *CredentialManager) commitSuccessor(ctx context.Context, replacement man
 	verified, err := m.api.Self(ctx, replacement.ServiceCredential)
 	if err != nil {
 		return err
+	}
+	if !verified.RenewalEnabled {
+		return ErrManagedRenewalDisabled
 	}
 	if !validServiceInfo(verified, m.tenant) || verified.SubjectID != replacement.SubjectID || verified.CredentialID != replacement.CredentialID || verified.Scope != replacement.Scope || !m.now().Before(verified.EffectiveAcceptUntil) {
 		return ErrRenewalRejected

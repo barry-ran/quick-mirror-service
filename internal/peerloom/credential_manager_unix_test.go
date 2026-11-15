@@ -200,3 +200,13 @@ func TestManagedDurableSuccessorRecoversAfterOldOverlapExpires(t *testing.T) {
 		t.Fatal("recovery forked or stayed degraded")
 	}
 }
+
+func TestManagedDisabledSubjectRejectedAtStartup(t *testing.T) {
+	f := renewalFixture()
+	f.old.RenewalEnabled = false
+	p := filepath.Join(privateCredentialDir(t), "key")
+	_ = os.WriteFile(p, []byte("old_secret"), 0600)
+	if _, err := NewCredentialManager(context.Background(), p, renewalTenant, f); !errors.Is(err, ErrManagedRenewalDisabled) {
+		t.Fatal(err)
+	}
+}
