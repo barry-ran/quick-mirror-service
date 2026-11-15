@@ -69,6 +69,7 @@ jobs:
       - run: python3 scripts/validate-openapi.py
       - run: go test -race -tags integration ./internal/catalog ./internal/bootstrap ./internal/binding ./internal/httpapi ./internal/control ./internal/peerloom
 
+      # Peerloom v0.3.0 exact release-source candidate; keep both SHA pins identical.
       - name: Checkout pinned Peerloom management runtime fixture source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
