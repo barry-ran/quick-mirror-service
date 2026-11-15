@@ -9,7 +9,10 @@ import (
 	"errors"
 	"github.com/barry-ran/quick-mirror-service/internal/binding"
 	"github.com/barry-ran/quick-mirror-service/internal/catalog"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -949,5 +952,51 @@ func TestInFlightBindCannotCrossCloseAndUnboundRecovery(t *testing.T) {
 	final, e := s.Get(ctx, owner, i.ID)
 	if e != nil || final.State != "released" || final.Session != "" || !final.revoked {
 		t.Fatalf("unsafe recovery %+v %v", final, e)
+	}
+}
+
+func TestCreatePinsFileCredentialAcrossPersistenceAndDispatch(t *testing.T) {
+	s := testStore(t, &fakeUpstream{domain: "fixture"})
+	path := filepath.Join(t.TempDir(), "key")
+	if err := os.WriteFile(path, []byte("svc_old"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	source, err := peerloom.NewFileCredentialSource(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer svc_old" {
+			t.Error("operation crossed credential versions")
+		}
+		if strings.HasPrefix(r.URL.Path, "/v1/devices/") {
+			// Rotate after the first upstream call, before the intent row is persisted.
+			if err := os.WriteFile(path, []byte("svc_new"), 0600); err != nil {
+				t.Error(err)
+			}
+			on := true
+			json.NewEncoder(w).Encode(peerloom.ControlDevice{ID: phone, TenantID: tenant, ApplicationID: mobileApp, Status: "active", Online: &on})
+		} else {
+			w.WriteHeader(http.StatusCreated)
+			json.NewEncoder(w).Encode(peerloom.ControlGrant{ID: grantID, TenantID: tenant, SourceDeviceID: pc, TargetDeviceID: phone, ExpiresAt: time.Now().Add(time.Hour), ExpiryAction: "no_new_connections", MaxSessions: 1})
+		}
+	}))
+	defer server.Close()
+	client, err := peerloom.NewControlClientWithSource(peerloom.IdentityConfig{Origin: server.URL, TenantID: tenant, PCApplicationID: owner.ApplicationID, MobileApplicationID: mobileApp}, source, server.Client(), 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := client.ReplayDomain()
+	s.upstream = client
+	intent, created, err := s.Create(context.Background(), owner, phone, command(t))
+	if err != nil || !created || intent.Outcome == "unknown" {
+		t.Fatalf("create failed: %+v %v", intent, err)
+	}
+	var domain string
+	if err := s.pool.QueryRow(context.Background(), `SELECT replay_domain FROM qm_control_intents WHERE service_scope=$1 AND id=$2`, scope, intent.ID).Scan(&domain); err != nil {
+		t.Fatal(err)
+	}
+	if domain != before || domain == client.ReplayDomain() {
+		t.Fatal("persisted domain did not pin the request credential")
 	}
 }
