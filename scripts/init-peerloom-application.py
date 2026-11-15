@@ -24,24 +24,27 @@ def identifier(value):
     return value
 
 
-def application_payload(role, name):
+def application_payload(role, name, approval):
     if role not in ("pc", "mobile") or not isinstance(name, str) or not name.strip() or len(name) > 128:
         raise SetupError("INVALID_APPLICATION")
-    return {"name": name, "registration_mode": "grant", "require_target_approval": role == "mobile"}
+    if type(approval) is not bool:
+        raise SetupError("EXPLICIT_APPROVAL_REQUIRED")
+    return {"name": name, "registration_mode": "grant", "require_target_approval": approval}
 
 
-def validate_application(app, role, tenant):
+def validate_application(app, tenant, approval=None):
     if not isinstance(app, dict):
         raise SetupError("INVALID_APPLICATION_RESPONSE")
     identifier(app.get("id"))
     if (app.get("tenant_id") != tenant or app.get("enabled") is not True
             or app.get("registration_mode") != "grant"
-            or app.get("require_target_approval") is not (role == "mobile")):
+            or type(app.get("require_target_approval")) is not bool
+            or (approval is not None and app["require_target_approval"] is not approval)):
         raise SetupError("APPLICATION_POLICY_MISMATCH")
     return app
 
 
-def initialize(call, role, tenant, name=None, operation=None, existing=None):
+def initialize(call, role, tenant, name=None, operation=None, existing=None, approval=None):
     identifier(tenant)
     if role not in ("pc", "mobile"):
         raise SetupError("INVALID_ROLE")
@@ -51,8 +54,8 @@ def initialize(call, role, tenant, name=None, operation=None, existing=None):
         result = call("GET", "/v1/applications/" + identifier(existing), None, None, 200)
     else:
         identifier(operation)
-        result = call("POST", "/v1/applications", application_payload(role, name), operation, 201)
-    result = validate_application(result, role, tenant)
+        result = call("POST", "/v1/applications", application_payload(role, name, approval), operation, 201)
+    result = validate_application(result, tenant, approval)
     if existing and result["id"] != existing:
         raise SetupError("APPLICATION_ID_MISMATCH")
     if name is not None and result.get("name") != name:
@@ -60,9 +63,10 @@ def initialize(call, role, tenant, name=None, operation=None, existing=None):
     if not existing:
         # Creation receipts can be replayed after an operator changed policy.
         current = call("GET", "/v1/applications/" + result["id"], None, None, 200)
-        validate_application(current, role, tenant)
+        validate_application(current, tenant, approval)
         if current.get("id") != result["id"] or current.get("name") != name:
             raise SetupError("APPLICATION_IDENTITY_MISMATCH")
+        result = current
     return result
 
 
@@ -119,17 +123,22 @@ def main():
     parser.add_argument("--tenant", required=True)
     parser.add_argument("--role", choices=("pc", "mobile"), required=True)
     parser.add_argument("--name")
+    parser.add_argument("--require-target-approval", choices=("true", "false"),
+        help="Required for creation; optional expected policy for read-only existing checks")
     choice = parser.add_mutually_exclusive_group(required=True)
     choice.add_argument("--operation-id", help="Keep this UUID and all inputs unchanged when retrying")
     choice.add_argument("--existing-id", help="Read-only policy check; never PATCH existing applications")
     args = parser.parse_args()
+    if args.operation_id and args.require_target_approval is None:
+        parser.error("creation requires --require-target-approval true|false")
+    approval = None if args.require_target_approval is None else args.require_target_approval == "true"
     try:
         identifier(args.tenant)
         client = Client(args.origin, args.credential_file, args.ca_file)
         own = client.call("GET", "/v1/service-credentials/self", None, None, 200)
         if not isinstance(own, dict) or own.get("tenant_id") != args.tenant or own.get("scope") != "admin":
             raise SetupError("SERVICE_PRINCIPAL_MISMATCH")
-        result = initialize(client.call, args.role, args.tenant, args.name, args.operation_id, args.existing_id)
+        result = initialize(client.call, args.role, args.tenant, args.name, args.operation_id, args.existing_id, approval)
         print(json.dumps({"application_id": result["id"], "tenant_id": args.tenant,
             "role": args.role, "require_target_approval": result["require_target_approval"]}))
         return 0

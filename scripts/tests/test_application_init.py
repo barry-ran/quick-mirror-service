@@ -37,19 +37,21 @@ class Fake:
 
 
 class InitializationTest(unittest.TestCase):
-    def test_mobile_true_pc_false_exact_payload_and_repeat(self):
+    def test_both_roles_support_both_explicit_policies_and_repeat(self):
         for role in ("mobile", "pc"):
-            fake = Fake(role)
-            for _ in range(2):
-                module.initialize(fake, role, TENANT, "QM", OP)
-            self.assertEqual(1, fake.creates)
-            self.assertEqual(fake.calls[0], fake.calls[2])
-            self.assertEqual({"name": "QM", "registration_mode": "grant",
-                              "require_target_approval": role == "mobile"}, fake.calls[0][2])
+            for approval in (True, False):
+                fake = Fake()
+                fake.app["require_target_approval"] = approval
+                for _ in range(2):
+                    module.initialize(fake, role, TENANT, "QM", OP, approval=approval)
+                self.assertEqual(1, fake.creates)
+                self.assertEqual(fake.calls[0], fake.calls[2])
+                self.assertEqual({"name": "QM", "registration_mode": "grant",
+                                  "require_target_approval": approval}, fake.calls[0][2])
 
     def test_existing_only_reads(self):
         fake = Fake()
-        module.initialize(fake, "mobile", TENANT, "QM", existing=APP)
+        module.initialize(fake, "mobile", TENANT, "QM", existing=APP, approval=True)
         self.assertEqual(["GET"], [call[0] for call in fake.calls])
 
     def test_existing_wrong_policy_identity_disabled_never_updates(self):
@@ -59,7 +61,7 @@ class InitializationTest(unittest.TestCase):
             fake = Fake()
             fake.app[field] = value
             with self.assertRaises(module.SetupError):
-                module.initialize(fake, "mobile", TENANT, "QM", existing=APP)
+                module.initialize(fake, "mobile", TENANT, "QM", existing=APP, approval=True)
             self.assertEqual(["GET"], [call[0] for call in fake.calls])
 
     def test_creation_failure_has_no_compensating_update_or_pc_call(self):
@@ -68,16 +70,16 @@ class InitializationTest(unittest.TestCase):
             calls.append(args)
             raise module.SetupError("HTTP_503")
         with self.assertRaises(module.SetupError):
-            module.initialize(fail, "mobile", TENANT, "QM", OP)
+            module.initialize(fail, "mobile", TENANT, "QM", OP, approval=True)
         self.assertEqual(1, len(calls))
         self.assertEqual("POST", calls[0][0])
         self.assertTrue(calls[0][2]["require_target_approval"])
 
     def test_reused_operation_with_different_payload_is_not_retried(self):
         fake = Fake()
-        module.initialize(fake, "mobile", TENANT, "QM", OP)
+        module.initialize(fake, "mobile", TENANT, "QM", OP, approval=True)
         with self.assertRaisesRegex(module.SetupError, "HTTP_409"):
-            module.initialize(fake, "mobile", TENANT, "Changed", OP)
+            module.initialize(fake, "mobile", TENANT, "Changed", OP, approval=True)
         self.assertEqual(1, fake.creates)
         self.assertEqual(3, len(fake.calls))
 
@@ -89,7 +91,7 @@ class InitializationTest(unittest.TestCase):
                 result["require_target_approval"] = False
             return result
         with self.assertRaisesRegex(module.SetupError, "POLICY_MISMATCH"):
-            module.initialize(changed, "mobile", TENANT, "QM", OP)
+            module.initialize(changed, "mobile", TENANT, "QM", OP, approval=True)
         self.assertEqual(["POST", "GET"], [call[0] for call in fake.calls])
 
     def test_invalid_inputs_fail_before_request(self):
@@ -98,6 +100,34 @@ class InitializationTest(unittest.TestCase):
             with self.assertRaises(module.SetupError):
                 module.initialize(fake, "mobile", TENANT, "QM", key)
         self.assertEqual([], fake.calls)
+
+    def test_existing_returns_current_policy_after_either_transition(self):
+        for role in ("pc", "mobile"):
+            fake = Fake()
+            for approval in (False, True, False):
+                fake.app["require_target_approval"] = approval
+                result = module.initialize(fake, role, TENANT, existing=APP)
+                self.assertIs(approval, result["require_target_approval"])
+                module.initialize(fake, role, TENANT, existing=APP, approval=approval)
+                with self.assertRaisesRegex(module.SetupError, "POLICY_MISMATCH"):
+                    module.initialize(fake, role, TENANT, existing=APP, approval=not approval)
+            self.assertTrue(all(call[0] == "GET" for call in fake.calls))
+
+    def test_create_policy_is_mandatory_and_not_inferred_from_role(self):
+        for role in ("pc", "mobile"):
+            fake = Fake()
+            for approval in (None, 1, "true"):
+                with self.assertRaisesRegex(module.SetupError, "EXPLICIT_APPROVAL_REQUIRED"):
+                    module.initialize(fake, role, TENANT, "QM", OP, approval=approval)
+            self.assertEqual([], fake.calls)
+
+    def test_changed_approval_with_old_operation_fails_without_mutation(self):
+        fake = Fake()
+        module.initialize(fake, "mobile", TENANT, "QM", OP, approval=True)
+        with self.assertRaisesRegex(module.SetupError, "HTTP_409"):
+            module.initialize(fake, "mobile", TENANT, "QM", OP, approval=False)
+        self.assertTrue(fake.app["require_target_approval"])
+        self.assertEqual(1, fake.creates)
 
     def test_http_contract_uses_direct_json_and_explicit_key(self):
         class Response(io.BytesIO):
@@ -113,7 +143,7 @@ class InitializationTest(unittest.TestCase):
         client = object.__new__(module.Client)
         client.origin, client.token, client.opener = "https://peer.example", "test-only", Opener()
         self.assertEqual(APP, client.call("POST", "/v1/applications",
-            module.application_payload("mobile", "QM"), OP, 201)["id"])
+            module.application_payload("mobile", "QM", True), OP, 201)["id"])
 
     def test_http_failure_never_echoes_response_or_credentials(self):
         class Opener:
