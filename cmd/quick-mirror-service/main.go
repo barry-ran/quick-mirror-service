@@ -28,6 +28,7 @@ type config struct {
 	HTTP              httpapi.BootstrapConfig
 	Database          string
 	ServiceCredential string
+	CredentialSource  peerloom.CredentialSource
 	Address           string
 	CertificateFile   string
 	KeyFile           string
@@ -38,6 +39,16 @@ type config struct {
 
 func loadConfig() (config, error) {
 	c := config{Database: os.Getenv("QM_DATABASE_URL"), ServiceCredential: os.Getenv("QM_PEERLOOM_SERVICE_CREDENTIAL"), Address: os.Getenv("QM_LISTEN_ADDRESS"), CertificateFile: os.Getenv("QM_TLS_CERT_FILE"), KeyFile: os.Getenv("QM_TLS_KEY_FILE")}
+	if path := os.Getenv("QM_PEERLOOM_SERVICE_CREDENTIAL_FILE"); path != "" {
+		if c.ServiceCredential != "" {
+			return c, errors.New("AMBIGUOUS_PEERLOOM_CREDENTIAL_CONFIGURATION")
+		}
+		var err error
+		c.CredentialSource, err = peerloom.NewFileCredentialSource(path)
+		if err != nil {
+			return c, errors.New("INVALID_PEERLOOM_CREDENTIAL_FILE")
+		}
+	}
 	c.HTTP.Identity = peerloom.IdentityConfig{Origin: os.Getenv("QM_PEERLOOM_ORIGIN"), TenantID: os.Getenv("QM_TENANT_ID"), PCApplicationID: os.Getenv("QM_PC_APPLICATION_ID"), MobileApplicationID: os.Getenv("QM_MOBILE_APPLICATION_ID")}
 	c.HTTP.ServiceScope = os.Getenv("QM_SERVICE_SCOPE")
 	if c.Address == "" {
@@ -71,7 +82,7 @@ func loadConfig() (config, error) {
 	if c.Database == "" || c.CertificateFile == "" || c.KeyFile == "" {
 		return c, errors.New("DATABASE_AND_TLS_CONFIGURATION_REQUIRED")
 	}
-	if _, err := peerloom.NewRegistrationClient(c.HTTP.Identity, c.ServiceCredential, nil); err != nil {
+	if _, err := c.registrationClient(nil); err != nil {
 		return c, errors.New("INVALID_PEERLOOM_CONFIGURATION")
 	}
 	// 只校验配置，不向网络发送请求；实际 Store 在数据库初始化后构造。
@@ -123,7 +134,7 @@ func serve(ctx context.Context, c config, migrate bool) error {
 	if err != nil {
 		return errors.New("DATABASE_UNAVAILABLE")
 	}
-	issuer, err := peerloom.NewRegistrationClient(c.HTTP.Identity, c.ServiceCredential, c.upstreamClient)
+	issuer, err := c.registrationClient(c.upstreamClient)
 	if err != nil {
 		return errors.New("INVALID_PEERLOOM_CONFIGURATION")
 	}
@@ -147,7 +158,7 @@ func serve(ctx context.Context, c config, migrate bool) error {
 	if grantTTL == 0 {
 		grantTTL = 300
 	}
-	transport, err := peerloom.NewControlClientWithGrantTTL(c.HTTP.Identity, c.ServiceCredential, c.upstreamClient, grantTTL)
+	transport, err := c.controlClient(c.upstreamClient, grantTTL)
 	if err != nil {
 		return errors.New("INVALID_CONTROL_CONFIGURATION")
 	}
@@ -273,4 +284,17 @@ func main() {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
+}
+
+func (c config) registrationClient(client *http.Client) (*peerloom.RegistrationClient, error) {
+	if c.CredentialSource != nil {
+		return peerloom.NewRegistrationClientWithSource(c.HTTP.Identity, c.CredentialSource, client)
+	}
+	return peerloom.NewRegistrationClient(c.HTTP.Identity, c.ServiceCredential, client)
+}
+func (c config) controlClient(client *http.Client, ttl int) (*peerloom.ControlClient, error) {
+	if c.CredentialSource != nil {
+		return peerloom.NewControlClientWithSource(c.HTTP.Identity, c.CredentialSource, client, ttl)
+	}
+	return peerloom.NewControlClientWithGrantTTL(c.HTTP.Identity, c.ServiceCredential, client, ttl)
 }

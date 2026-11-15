@@ -317,6 +317,20 @@ func (s *Store) ByCommand(ctx context.Context, p identity.Principal, key string)
 	return visible(i, p), e
 }
 func (s *Store) Create(ctx context.Context, p identity.Principal, target, key string) (Intent, bool, error) {
+	// Pin a single immutable credential across intent persistence and dispatch.
+	// No shared Store mutation: concurrent requests may use the next file version.
+	if dynamic, ok := s.upstream.(*peerloom.ControlClient); ok {
+		frozen, err := dynamic.Snapshot()
+		if err != nil {
+			return Intent{}, false, identity.ErrUnavailable
+		}
+		if frozen != dynamic {
+			snapshot := *s
+			snapshot.upstream = frozen
+			return snapshot.Create(ctx, p, target, key)
+		}
+	}
+
 	p, e := s.principal(p)
 	if e != nil {
 		return Intent{}, false, e
@@ -439,6 +453,17 @@ func (s *Store) Create(ctx context.Context, p identity.Principal, target, key st
 	return i, true, e
 }
 func (s *Store) dispatch(ctx context.Context, id string) error {
+	upstream := s.upstream
+	if dynamic, ok := upstream.(interface {
+		Snapshot() (*peerloom.ControlClient, error)
+	}); ok {
+		frozen, err := dynamic.Snapshot()
+		if err != nil {
+			return identity.ErrUnavailable
+		}
+		upstream = frozen
+	}
+
 	tx, e := s.begin(ctx)
 	if e != nil {
 		return e
@@ -476,7 +501,7 @@ func (s *Store) dispatch(ctx context.Context, id string) error {
 		}
 		return tx.Commit(ctx)
 	}
-	if i.domain != s.upstream.ReplayDomain() {
+	if i.domain != upstream.ReplayDomain() {
 		_, e = tx.Exec(ctx, `UPDATE qm_control_intents SET outcome='unknown',revision=revision+1 WHERE service_scope=$1 AND id=$2`, s.scope, id)
 		if e != nil {
 			return e
@@ -490,7 +515,7 @@ func (s *Store) dispatch(ctx context.Context, id string) error {
 	if e = tx.Commit(ctx); e != nil {
 		return e
 	}
-	g, callErr := s.upstream.CreateGrant(ctx, i.Owner, i.Target, i.createKey)
+	g, callErr := upstream.CreateGrant(ctx, i.Owner, i.Target, i.createKey)
 	if callErr != nil {
 		return nil
 	}

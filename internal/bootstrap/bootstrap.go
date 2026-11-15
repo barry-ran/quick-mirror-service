@@ -78,6 +78,16 @@ func (r Request) fingerprints() ([32]byte, [32]byte, error) {
 // 不持有数据库事务跨网络请求，也不在业务库保存 bearer grant 明文。
 func (s *Store) Issue(ctx context.Context, request Request) (peerloom.RegistrationGrant, error) {
 	var empty peerloom.RegistrationGrant
+	issuer := s.issuer
+	if dynamic, ok := issuer.(interface {
+		Snapshot() (*peerloom.RegistrationClient, error)
+	}); ok {
+		frozen, err := dynamic.Snapshot()
+		if err != nil {
+			return empty, identity.ErrUnavailable
+		}
+		issuer = frozen
+	}
 	keyHash, requestHash, err := request.fingerprints()
 	if err != nil {
 		return empty, err
@@ -93,17 +103,17 @@ func (s *Store) Issue(ctx context.Context, request Request) (peerloom.Registrati
 	var savedDomain string
 	err = s.pool.QueryRow(ctx, `INSERT INTO qm_bootstrap_intents(service_scope,key_hash,request_hash,upstream_key,replay_domain)
 VALUES($1,$2,$3,$4,$5) ON CONFLICT(service_scope,key_hash) DO UPDATE SET key_hash=qm_bootstrap_intents.key_hash
-RETURNING request_hash,upstream_key,expires_at<=clock_timestamp(),replay_domain`, s.scope, keyHash[:], requestHash[:], upstreamKey, s.issuer.ReplayDomain()).Scan(&savedHash, &upstreamKey, &expired, &savedDomain)
+RETURNING request_hash,upstream_key,expires_at<=clock_timestamp(),replay_domain`, s.scope, keyHash[:], requestHash[:], upstreamKey, issuer.ReplayDomain()).Scan(&savedHash, &upstreamKey, &expired, &savedDomain)
 	if err != nil {
 		return empty, identity.ErrUnavailable
 	}
 	if string(savedHash) != string(requestHash[:]) {
 		return empty, peerloom.ErrIdempotencyConflict
 	}
-	if expired || savedDomain != s.issuer.ReplayDomain() {
+	if expired || savedDomain != issuer.ReplayDomain() {
 		return empty, peerloom.ErrReplayExpired
 	}
-	return s.issuer.Issue(ctx, request.Role, upstreamKey, 300)
+	return issuer.Issue(ctx, request.Role, upstreamKey, 300)
 }
 
 // PurgeExpired 只供部署维护入口调用。收据清理后，相同 key 不再享有幂等保证；

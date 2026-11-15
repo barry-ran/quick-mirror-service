@@ -31,6 +31,7 @@ type RegistrationGrant struct {
 // RegistrationClient 只给服务端使用。凭证须是固定租户的 admin service credential，
 // 不得接受客户端传入的 application、管理凭证或目标 URL。
 type RegistrationClient struct {
+	source     CredentialSource
 	endpoint   string
 	credential string
 	pc         string
@@ -40,7 +41,28 @@ type RegistrationClient struct {
 
 // ReplayDomain 是部署/凭证/app 映射的不可逆标识，不是认证凭证。
 // Peerloom 将幂等域绑定到管理凭证；轮换后旧尝试必须拒绝重发，而不能新签一个 grant。
+// Snapshot pins credential and replay domain for one operation.
+func (c *RegistrationClient) Snapshot() (*RegistrationClient, error) {
+	if c.source == nil {
+		return c, nil
+	}
+	value, err := c.source.Read()
+	if err != nil || !visibleASCII(value, 1, 512) {
+		return nil, ErrCredentialUnavailable
+	}
+	frozen := *c
+	frozen.credential = value
+	frozen.source = nil
+	return &frozen, nil
+}
 func (c *RegistrationClient) ReplayDomain() string {
+	if c.source != nil {
+		frozen, err := c.Snapshot()
+		if err != nil {
+			return ""
+		}
+		return frozen.ReplayDomain()
+	}
 	value, _ := json.Marshal([]string{c.endpoint, c.credential, c.pc, c.mobile})
 	digest := sha256.Sum256(value)
 	return hex.EncodeToString(digest[:])
@@ -64,6 +86,13 @@ func NewRegistrationClient(config IdentityConfig, serviceCredential string, clie
 // Issue 不自动重试。结果未知时调用方只能保留原 key/参数查询或重试，不能换 key 重发。
 // 公开接口的幂等窗口有期限，本 adapter 不承诺永久幂等或业务 bootstrap 的完整实现。
 func (c *RegistrationClient) Issue(ctx context.Context, role identity.Role, key string, ttlSeconds int) (RegistrationGrant, error) {
+	if c.source != nil {
+		frozen, err := c.Snapshot()
+		if err != nil {
+			return RegistrationGrant{}, err
+		}
+		return frozen.Issue(ctx, role, key, ttlSeconds)
+	}
 	var empty RegistrationGrant
 	if !visibleASCII(key, 8, 128) || ttlSeconds < 0 || ttlSeconds > 3600 {
 		return empty, ErrInvalidRegistration
@@ -142,4 +171,21 @@ func (c *RegistrationClient) Issue(ctx context.Context, role identity.Role, key 
 
 func visibleASCII(value string, min, max int) bool {
 	return len(value) >= min && len(value) <= max && strings.IndexFunc(value, func(r rune) bool { return r < 33 || r > 126 }) < 0
+}
+
+func NewRegistrationClientWithSource(config IdentityConfig, source CredentialSource, client *http.Client) (*RegistrationClient, error) {
+	if source == nil {
+		return nil, ErrCredentialUnavailable
+	}
+	value, err := source.Read()
+	if err != nil {
+		return nil, ErrCredentialUnavailable
+	}
+	c, err := NewRegistrationClient(config, value, client)
+	if err != nil {
+		return nil, err
+	}
+	c.source = source
+	c.credential = ""
+	return c, nil
 }

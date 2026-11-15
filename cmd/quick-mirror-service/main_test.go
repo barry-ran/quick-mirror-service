@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -8,6 +10,7 @@ import (
 func fixtureConfig(t *testing.T) {
 	t.Helper()
 	t.Setenv("QM_API_CONCURRENCY", "")
+	t.Setenv("QM_PEERLOOM_SERVICE_CREDENTIAL_FILE", "")
 	values := map[string]string{
 		"QM_DATABASE_URL":                "postgres://fixture:private-fixture@localhost/quickmirror_test?sslmode=verify-full",
 		"QM_PEERLOOM_SERVICE_CREDENTIAL": "svc_fixture",
@@ -60,5 +63,37 @@ func TestDatabaseRequiresVerifiedTLS(t *testing.T) {
 	}
 	if _, err := databaseConfig("postgres://%private-secret"); err == nil || strings.Contains(err.Error(), "private-secret") {
 		t.Fatal("bad DSN leaked")
+	}
+}
+
+func TestCredentialFileConfiguration(t *testing.T) {
+	fixtureConfig(t)
+	path := filepath.Join(t.TempDir(), "service-key")
+	if err := os.WriteFile(path, []byte("svc_fixture\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("QM_PEERLOOM_SERVICE_CREDENTIAL_FILE", path)
+	if _, err := loadConfig(); err == nil {
+		t.Fatal("ambiguous sources accepted")
+	}
+	t.Setenv("QM_PEERLOOM_SERVICE_CREDENTIAL", "")
+	c, err := loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.CredentialSource == nil || c.ServiceCredential != "" {
+		t.Fatal("file secret cached in config")
+	}
+	if _, err := c.registrationClient(nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.controlClient(nil, 300); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadConfig(); err == nil {
+		t.Fatal("missing file accepted")
 	}
 }

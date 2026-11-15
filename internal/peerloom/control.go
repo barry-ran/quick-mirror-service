@@ -19,6 +19,7 @@ var ErrDeviceNotFound = errors.New("peerloom device not found")
 
 // ControlClient只操作正式公开API，不自动重试变更、不读取Peerloom私表。
 type ControlClient struct {
+	source             CredentialSource
 	identity           *IdentityClient
 	origin, credential string
 	grantTTLSeconds    int
@@ -70,12 +71,41 @@ func NewControlClientWithGrantTTL(c IdentityConfig, credential string, client *h
 	}
 	return &ControlClient{identity: id, origin: strings.TrimSuffix(id.endpoint, "/v1/device-self"), credential: credential, grantTTLSeconds: seconds}, nil
 }
+
+// Snapshot pins credential and replay domain for one operation.
+func (c *ControlClient) Snapshot() (*ControlClient, error) {
+	if c.source == nil {
+		return c, nil
+	}
+	value, err := c.source.Read()
+	if err != nil || !visibleASCII(value, 1, 512) {
+		return nil, ErrCredentialUnavailable
+	}
+	frozen := *c
+	frozen.credential = value
+	frozen.source = nil
+	return &frozen, nil
+}
 func (c *ControlClient) ReplayDomain() string {
+	if c.source != nil {
+		frozen, err := c.Snapshot()
+		if err != nil {
+			return ""
+		}
+		return frozen.ReplayDomain()
+	}
 	b, _ := json.Marshal([]string{c.origin, c.identity.tenantID, c.credential})
 	h := sha256.Sum256(b)
 	return hex.EncodeToString(h[:])
 }
 func (c *ControlClient) request(ctx context.Context, method, path, key string, body any, out any) error {
+	if c.source != nil {
+		frozen, err := c.Snapshot()
+		if err != nil {
+			return err
+		}
+		return frozen.request(ctx, method, path, key, body, out)
+	}
 	var raw []byte
 	var err error
 	if body != nil {
@@ -180,6 +210,14 @@ func (c *ControlClient) RevokeGrant(ctx context.Context, id, key string) error {
 	return nil
 }
 func (c *ControlClient) GetSession(ctx context.Context, id string) (ControlSession, error) {
+	if c.source != nil {
+		frozen, err := c.Snapshot()
+		if err != nil {
+			return ControlSession{}, err
+		}
+		return frozen.GetSession(ctx, id)
+	}
+
 	var s ControlSession
 	id, ok := identity.NormalizeUUID(id)
 	if !ok {
@@ -233,4 +271,21 @@ func (c *ControlClient) GetDevice(ctx context.Context, id string) (ControlDevice
 		return ControlDevice{}, identity.ErrUnavailable
 	}
 	return d, nil
+}
+
+func NewControlClientWithSource(c IdentityConfig, source CredentialSource, client *http.Client, seconds int) (*ControlClient, error) {
+	if source == nil {
+		return nil, ErrCredentialUnavailable
+	}
+	value, err := source.Read()
+	if err != nil {
+		return nil, ErrCredentialUnavailable
+	}
+	result, err := NewControlClientWithGrantTTL(c, value, client, seconds)
+	if err != nil {
+		return nil, err
+	}
+	result.source = source
+	result.credential = ""
+	return result, nil
 }
