@@ -159,7 +159,7 @@ def main():
                 raise RuntimeError('Peerloom readiness timeout')
             svc = admin['service_credential']
             tenant = admin['tenant_id']
-            apps = [call(P, 'POST', '/v1/applications', svc, {'name': name}, 201)['id'] for name in ['PC', 'Mobile', 'Other']]
+            apps = [call(P, 'POST', '/v1/applications', svc, {'name': name, 'require_target_approval': name == 'Mobile'}, 201)['id'] for name in ['PC', 'Mobile', 'Other']]
 
             def register(app):
                 grant = call(P, 'POST', '/v1/registration-grants', svc, {'application_id': app}, 201)['grant']

@@ -24,6 +24,10 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - run: python -m unittest discover -s scripts/tests -p "test_*.py"
       - run: go test -race ./...
       - run: go vet ./...
       - run: go build ./...
