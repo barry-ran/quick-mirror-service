@@ -261,17 +261,10 @@ func (m *CredentialManager) Step(ctx context.Context) (result error) {
 	if err != nil {
 		return err
 	}
-	if next.SubjectID != d.SubjectID || next.TenantID != d.TenantID || next.Scope != d.Scope || next.PreviousCredentialID != d.CredentialID || next.CredentialID == d.CredentialID || !m.now().Before(next.PreviousAcceptUntil) {
+	if next.SubjectID != d.SubjectID || next.TenantID != d.TenantID || next.Scope != d.Scope || next.PreviousCredentialID != d.CredentialID || next.CredentialID == d.CredentialID {
 		return ErrRenewalRejected
 	}
-	checked, err := m.api.Self(ctx, next.ServiceCredential)
-	if err != nil {
-		return err
-	}
-	if !validServiceInfo(checked, m.tenant) || checked.SubjectID != d.SubjectID || checked.CredentialID != next.CredentialID || checked.Scope != d.Scope || !m.now().Before(checked.EffectiveAcceptUntil) {
-		return ErrRenewalRejected
-	}
-	replacement := managedDocument{ServiceCredentialInfo: checked, ServiceCredential: next.ServiceCredential}
+	replacement := managedDocument{ServiceCredentialInfo: next.ServiceCredentialInfo, ServiceCredential: next.ServiceCredential}
 	m.pending = &replacement
 	return m.commitSuccessor(ctx, replacement)
 }

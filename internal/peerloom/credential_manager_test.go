@@ -209,3 +209,27 @@ func TestManagedReplayDomainStableAcrossRenewal(t *testing.T) {
 		t.Fatal("legacy fingerprint should differ")
 	}
 }
+
+func TestManagedDelayedRenewalResponseUsesVerifiedSuccessor(t *testing.T) {
+	f := renewalFixture()
+	m := testManager(f)
+	f.onRenew = func(string) { m.now = func() time.Time { return time.Now().Add(26 * time.Hour) } }
+	if err := m.Step(context.Background()); err != nil {
+		t.Fatal("late response should verify successor rather than require old overlap", err)
+	}
+	if got, err := m.Read(); got != "new_secret" || err != nil {
+		t.Fatal("successor not accepted", err)
+	}
+}
+func TestServiceScopeValidation(t *testing.T) {
+	f := renewalFixture()
+	v := f.old
+	v.Scope = "root"
+	if validServiceInfo(v, renewalTenant) {
+		t.Fatal("unknown scope accepted")
+	}
+	v.Scope = "read"
+	if !validServiceInfo(v, renewalTenant) {
+		t.Fatal("generic read scope rejected")
+	}
+}

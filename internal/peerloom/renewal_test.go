@@ -20,7 +20,7 @@ func TestRenewalAPIContract(t *testing.T) {
 		}
 		if mode != "ok" {
 			w.WriteHeader(409)
-			_ = json.NewEncoder(w).Encode(map[string]string{"code": mode})
+			_ = json.NewEncoder(w).Encode(map[string]any{"type": "about:blank", "title": "Conflict", "status": 409, "code": mode, "detail": mode, "request_id": "fixture"})
 			return
 		}
 		switch r.URL.Path {
