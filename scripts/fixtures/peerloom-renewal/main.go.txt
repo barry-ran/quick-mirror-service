@@ -44,7 +44,8 @@ func run() error {
  if err=os.WriteFile(filepath.Join(output,"ca.pem"),ca,0600);err!=nil{return err}
  metadata,err:=json.Marshal(map[string]string{"origin":server.URL,"schema":schema,"tenant_id":setup.TenantID,"credential_id":setup.CredentialID,"application_id":setup.ApplicationID})
  if err!=nil{return err}
- if err=os.WriteFile(filepath.Join(output,"ready.json"),metadata,0600);err!=nil{return err}
+ if err=os.WriteFile(filepath.Join(output,"ready.tmp"),metadata,0600);err!=nil{return err}
+ if err=os.Rename(filepath.Join(output,"ready.tmp"),filepath.Join(output,"ready.json"));err!=nil{return err}
  stop,done:=signal.NotifyContext(context.Background(),os.Interrupt,syscall.SIGTERM);defer done()
  closed:=make(chan struct{});go func(){io.Copy(io.Discard,os.Stdin);close(closed)}()
  select {case <-closed:case <-stop.Done():};return nil
