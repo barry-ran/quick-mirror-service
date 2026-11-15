@@ -29,23 +29,32 @@ go test -race -tags integration ./internal/...
 需要验证真实源码服务间公开API时，参见[部署指南中的双服务隔离测试](docs/部署指南.md#云端源码双服务隔离测试)。该入口不连接现场，不等于正式SDK或真机验收。
 
 
-## Peerloom 服务凭据文件与热轮换
+## Peerloom 服务凭据自动续期
 
-可信业务后端可改用 `QM_PEERLOOM_SERVICE_CREDENTIAL_FILE`（绝对路径）读取单行服务凭据或 `device-admin` 输出 JSON 的 `service_credential` 字段；它与原 `QM_PEERLOOM_SERVICE_CREDENTIAL` 环境变量互斥。原环境变量模式仍兼容，但其值在启动时固定。首次切换配置仍须重启服务；文件模式启用后，新请求读取新的文件内容，无须再次重启。
+Linux/macOS 服务使用 `QM_PEERLOOM_SERVICE_CREDENTIAL_FILE` 指定绝对路径后，默认托管续期，无需另开开关或每月手动操作。初始文件可直接使用 `device-admin` 生成的 JSON，也接受单行凭据。QM 通过 Peerloom `GET /v1/service-credentials/self` 验证主体、租户、权限及期限，不相信文件中自报的身份元数据；租户和 PC/手机应用映射仍由 QM 的部署配置决定。
 
-文件必须是可信本地普通文件（不接受末级符号链接），凭据最多 512 个可见 ASCII 字符；单行格式可附一个 LF 或 CRLF，JSON 文件总长不超过 16 KiB。JSON 中其他元数据不替代 QM 配置的租户和应用 ID。父目录必须由可信运维控制，Linux/macOS 使用非阻塞且不跟随末级链接的打开方式，Windows 拒绝 UNC/设备路径并校验文件身份。读取有大小上限；缺失、空文件、非法内容或不可读会拒绝对应上游操作，不继续偷偷使用旧密钥、不在错误中输出文件内容。部署时限制文件及父目录访问，仅服务账号可读、运维账号可替换。Docker 应只读挂载父目录而非单文件，运维在同一目录准备新文件后原子替换，避免读到半写内容或挂载仍指向旧 inode。
+目录必须属于服务账号且权限为 `0700`，普通凭据文件为 `0600`，不接受末级符号链接和硬链接。JSON 总长不超过 16 KiB，secret 不超过 512 个可见 ASCII 字符。Docker **可写挂载专用父目录**，不要只挂单文件，也不要只读挂载。该目录同时保存凭据和续期操作标识，进程使用排他文件锁；第二个 writer 会启动失败。运行期间不要手工覆盖此托管文件。首次迁移请运行 `-migrate` 创建幂等域映射表，再启动服务；旧只读挂载必须先改成专用可写私有目录，否则服务明确启动失败。
 
 ```mermaid
 sequenceDiagram
-    participant Ops as 运维
-    participant File as 挂载凭据文件
-    participant QM as QM 服务
+    participant File as 私有持久凭据文件
+    participant QM as QM 续期 worker
     participant PL as Peerloom
-    Ops->>File: 空闲窗口原子替换同租户凭据
-    QM->>File: 为操作读取有界快照
-    File-->>QM: 当前凭据
-    QM->>PL: 同一快照发起鉴权请求
-    PL-->>QM: 按租户与权限验证
+    QM->>PL: 当前 key 查询 self（认证稳定主体）
+    PL-->>QM: 主体、有效期、renew_after
+    QM->>File: 原子保存当前 key 与随机操作 UUID，fsync
+    QM->>PL: 同一操作 ID 申请续期
+    PL-->>QM: 同主体同权限新 key，旧 key 有限重叠期
+    QM->>PL: 新 key 查询 self，核验主体和权限不变
+    QM->>File: 临时文件 fsync → rename → 目录 fsync
+    QM->>QM: 持久化成功后发布新快照
+    Note over QM,PL: 丢响应或重启只能用持久的同一操作 ID 恢复
 ```
 
-此功能不签发新凭据、不自动续期、不扩大权限，也不撤销旧凭据。推荐在没有新注册或新建控制意图的空闲窗口轮换，并保留旧凭据有效到已在途请求排空。快照确保注册操作及控制 dispatch 的凭据与持久幂等域一致；同注册请求在换 key 后重试仍保守拒绝，同一 Create 调用跨持久化和 dispatch 保持快照；若 reserving 在进程中断后跨 key 恢复仍可能标记结果未知，不能承诺所有在途流程无感。不可把重试改成无条件重签。既有同租户 grant 查询、撤销与后续新操作使用新凭据，现有绑定不会因此被清理。
+Peerloom 当前默认期限 30 天，提前 7 天可续期，前后代最多重叠 24 小时；QM 按上游返回的 `renew_after` 触发，不硬编码续期日期。一个 worker 定期检查，暂时网络故障自动退避和重试，不阻塞请求线程，也不立即中断仍有效的会话。返回被撤销/失效时不能自动签发越权替代凭据。任何持久化失败都不发布新内存快照，不更换重试操作 ID；持久日志丢失或上游拒绝回放时必须明确报错，不能猜测或生成第二次续期绕过。
+
+业务请求固定凭据快照，续期后新请求使用新 key。幂等域改用上游认证的稳定服务主体；首次启动仅将**当前已认证旧 key 的精确旧域**映射到新域，并事务写入数据库审计映射，不迁移无法证明所属主体的旧记录。Peerloom 同主体后继凭据可访问原幂等记录，既有绑定、grant 和会话不因 key 更新被清理。未曾持有的历史 key 域不会被猜测迁移。此能力要求 Peerloom 已支持服务主体和续期 API；旧上游会明确启动失败，而非假装自动续期。
+
+`GET /healthz` 返回 `credential_status`，续期失败、持久化失败、即将到期或失效时返回 503；恢复成功自动回到健康。结构化日志仅记录事件类别、主体 ID、凭据 ID 和剩余秒数，不输出 secret 或上游响应正文。故障期间仍在有效期内的凭据可继续服务，但健康探针表示需关注，不应把所有 503 直接解释为必须重启进程。
+
+原 `QM_PEERLOOM_SERVICE_CREDENTIAL` 是明确的 **legacy 静态模式，不自动续期**，与 FILE 互斥；健康状态为 `legacy_static`，不宣称具备自动维护能力。Windows 首版不支持托管 FILE，启动时明确拒绝；只支持 legacy 静态模式。正式自建部署使用 Linux 托管模式，无新增 UI 或外部通知渠道。

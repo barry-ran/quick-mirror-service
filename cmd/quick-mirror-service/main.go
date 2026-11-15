@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -29,6 +30,7 @@ type config struct {
 	Database          string
 	ServiceCredential string
 	CredentialSource  peerloom.CredentialSource
+	CredentialFile    string
 	Address           string
 	CertificateFile   string
 	KeyFile           string
@@ -40,6 +42,7 @@ type config struct {
 func loadConfig() (config, error) {
 	c := config{Database: os.Getenv("QM_DATABASE_URL"), ServiceCredential: os.Getenv("QM_PEERLOOM_SERVICE_CREDENTIAL"), Address: os.Getenv("QM_LISTEN_ADDRESS"), CertificateFile: os.Getenv("QM_TLS_CERT_FILE"), KeyFile: os.Getenv("QM_TLS_KEY_FILE")}
 	if path := os.Getenv("QM_PEERLOOM_SERVICE_CREDENTIAL_FILE"); path != "" {
+		c.CredentialFile = path
 		if c.ServiceCredential != "" {
 			return c, errors.New("AMBIGUOUS_PEERLOOM_CREDENTIAL_CONFIGURATION")
 		}
@@ -134,6 +137,22 @@ func serve(ctx context.Context, c config, migrate bool) error {
 	if err != nil {
 		return errors.New("DATABASE_UNAVAILABLE")
 	}
+
+	var credentials *peerloom.CredentialManager
+	if !migrate && c.CredentialFile != "" {
+		api, err := peerloom.NewRenewalClient(c.HTTP.Identity, c.upstreamClient)
+		if err != nil {
+			return errors.New("INVALID_PEERLOOM_CONFIGURATION")
+		}
+		initial, cancel := context.WithTimeout(ctx, 15*time.Second)
+		credentials, err = peerloom.NewCredentialManager(initial, c.CredentialFile, c.HTTP.Identity.TenantID, api)
+		cancel()
+		if err != nil {
+			return err
+		}
+		defer credentials.Close()
+		c.CredentialSource = credentials
+	}
 	issuer, err := c.registrationClient(c.upstreamClient)
 	if err != nil {
 		return errors.New("INVALID_PEERLOOM_CONFIGURATION")
@@ -170,7 +189,7 @@ func serve(ctx context.Context, c config, migrate bool) error {
 	if migrate {
 		migration, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
-		if bindings.Migrate(migration) != nil || directory.Migrate(migration) != nil || store.Migrate(migration) != nil || intents.Migrate(migration) != nil {
+		if bindings.Migrate(migration) != nil || directory.Migrate(migration) != nil || store.Migrate(migration) != nil || intents.Migrate(migration) != nil || peerloom.MigrateReplaySchema(migration, pool) != nil {
 			return errors.New("MIGRATION_FAILED")
 		}
 		return nil
@@ -181,6 +200,15 @@ func serve(ctx context.Context, c config, migrate bool) error {
 	cancel()
 	if err != nil || !schemaReady {
 		return errors.New("MIGRATION_REQUIRED")
+	}
+
+	if credentials != nil {
+		migration, cancel := context.WithTimeout(ctx, 30*time.Second)
+		err = peerloom.MigrateReplayDomains(migration, pool, c.HTTP.ServiceScope, issuer, transport)
+		cancel()
+		if err != nil {
+			return errors.New("PEERLOOM_REPLAY_MIGRATION_FAILED")
+		}
 	}
 	pair, err := tls.LoadX509KeyPair(c.CertificateFile, c.KeyFile)
 	if err != nil {
@@ -203,6 +231,19 @@ func serve(ctx context.Context, c config, migrate bool) error {
 		return errors.New("INVALID_CONTROL_CONFIGURATION")
 	}
 	routes := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/healthz" {
+			w.Header().Set("Content-Type", "application/json")
+			status := "legacy_static"
+			if credentials != nil {
+				status = credentials.Health().Status
+				if status != "healthy" {
+					w.WriteHeader(http.StatusServiceUnavailable)
+				}
+			}
+			_ = json.NewEncoder(w).Encode(map[string]string{"credential_status": status})
+			return
+		}
+
 		if strings.HasPrefix(r.URL.Path, "/qm/v1/session-intents") || strings.HasPrefix(r.URL.Path, "/qm/v1/device-self/session-intents/") {
 			controls.ServeHTTP(w, r)
 			return
@@ -221,6 +262,23 @@ func serve(ctx context.Context, c config, migrate bool) error {
 	server := &http.Server{Addr: c.Address, Handler: routes, TLSConfig: &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{pair}}, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
 	maintenance, stopMaintenance := context.WithCancel(ctx)
 	maintenanceDone := make(chan struct{})
+	credentialDone := make(chan struct{})
+	if credentials != nil {
+		go func() {
+			defer close(credentialDone)
+			credentials.Run(maintenance, func(code string) {
+				h := credentials.Health()
+				record := struct {
+					Event string `json:"event"`
+					peerloom.CredentialHealth
+				}{code, h}
+				_ = json.NewEncoder(os.Stderr).Encode(record)
+			})
+		}()
+	} else {
+		close(credentialDone)
+	}
+
 	go func() {
 		defer close(maintenanceDone)
 		recovery := time.NewTicker(time.Second)
@@ -250,7 +308,7 @@ func serve(ctx context.Context, c config, migrate bool) error {
 			}
 		}
 	}()
-	defer func() { stopMaintenance(); <-maintenanceDone }()
+	defer func() { stopMaintenance(); <-maintenanceDone; <-credentialDone }()
 	finished := make(chan error, 1)
 	go func() { finished <- server.ListenAndServeTLS("", "") }()
 	select {

@@ -19,6 +19,7 @@ var ErrDeviceNotFound = errors.New("peerloom device not found")
 
 // ControlClient只操作正式公开API，不自动重试变更、不读取Peerloom私表。
 type ControlClient struct {
+	subject            string
 	source             CredentialSource
 	identity           *IdentityClient
 	origin, credential string
@@ -77,12 +78,14 @@ func (c *ControlClient) Snapshot() (*ControlClient, error) {
 	if c.source == nil {
 		return c, nil
 	}
-	value, err := c.source.Read()
+	snapshot, err := readCredentialSnapshot(c.source)
+	value := snapshot.Secret
 	if err != nil || !visibleASCII(value, 1, 512) {
 		return nil, ErrCredentialUnavailable
 	}
 	frozen := *c
 	frozen.credential = value
+	frozen.subject = snapshot.SubjectID
 	frozen.source = nil
 	return &frozen, nil
 }
@@ -93,6 +96,11 @@ func (c *ControlClient) ReplayDomain() string {
 			return ""
 		}
 		return frozen.ReplayDomain()
+	}
+	if c.subject != "" {
+		data, _ := json.Marshal([]string{"service-subject-v2", c.origin, c.identity.tenantID, c.subject})
+		sum := sha256.Sum256(data)
+		return hex.EncodeToString(sum[:])
 	}
 	b, _ := json.Marshal([]string{c.origin, c.identity.tenantID, c.credential})
 	h := sha256.Sum256(b)
@@ -288,4 +296,12 @@ func NewControlClientWithSource(c IdentityConfig, source CredentialSource, clien
 	result.source = source
 	result.credential = ""
 	return result, nil
+}
+
+// LegacyReplayDomain is used only while authenticating the exact pre-migration credential.
+func (c *ControlClient) LegacyReplayDomain() string {
+	f := *c
+	f.source = nil
+	f.subject = ""
+	return f.ReplayDomain()
 }

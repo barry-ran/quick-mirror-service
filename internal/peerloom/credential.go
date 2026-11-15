@@ -43,6 +43,10 @@ func (s *fileCredential) Read() (string, error) {
 	if err != nil || len(data) > 16<<10 {
 		return "", ErrCredentialUnavailable
 	}
+	return parseCredential(data)
+}
+
+func parseCredential(data []byte) (string, error) {
 	// device-admin setup/issue output can be mounted directly, without extracting secrets.
 	if strings.HasPrefix(strings.TrimSpace(string(data)), "{") {
 		var result struct {
@@ -59,4 +63,14 @@ func (s *fileCredential) Read() (string, error) {
 		return "", ErrCredentialUnavailable
 	}
 	return value, nil
+}
+
+func readCredentialSnapshot(source CredentialSource) (CredentialSnapshot, error) {
+	if managed, ok := source.(interface {
+		SnapshotCredential() (CredentialSnapshot, error)
+	}); ok {
+		return managed.SnapshotCredential()
+	}
+	secret, err := source.Read()
+	return CredentialSnapshot{Secret: secret}, err
 }

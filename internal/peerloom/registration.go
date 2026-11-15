@@ -31,6 +31,7 @@ type RegistrationGrant struct {
 // RegistrationClient 只给服务端使用。凭证须是固定租户的 admin service credential，
 // 不得接受客户端传入的 application、管理凭证或目标 URL。
 type RegistrationClient struct {
+	subject    string
 	source     CredentialSource
 	endpoint   string
 	credential string
@@ -46,12 +47,14 @@ func (c *RegistrationClient) Snapshot() (*RegistrationClient, error) {
 	if c.source == nil {
 		return c, nil
 	}
-	value, err := c.source.Read()
+	snapshot, err := readCredentialSnapshot(c.source)
+	value := snapshot.Secret
 	if err != nil || !visibleASCII(value, 1, 512) {
 		return nil, ErrCredentialUnavailable
 	}
 	frozen := *c
 	frozen.credential = value
+	frozen.subject = snapshot.SubjectID
 	frozen.source = nil
 	return &frozen, nil
 }
@@ -62,6 +65,11 @@ func (c *RegistrationClient) ReplayDomain() string {
 			return ""
 		}
 		return frozen.ReplayDomain()
+	}
+	if c.subject != "" {
+		data, _ := json.Marshal([]string{"service-subject-v2", c.endpoint, c.subject, c.pc, c.mobile})
+		sum := sha256.Sum256(data)
+		return hex.EncodeToString(sum[:])
 	}
 	value, _ := json.Marshal([]string{c.endpoint, c.credential, c.pc, c.mobile})
 	digest := sha256.Sum256(value)
@@ -188,4 +196,12 @@ func NewRegistrationClientWithSource(config IdentityConfig, source CredentialSou
 	c.source = source
 	c.credential = ""
 	return c, nil
+}
+
+// LegacyReplayDomain is used only while authenticating the exact pre-migration credential.
+func (c *RegistrationClient) LegacyReplayDomain() string {
+	f := *c
+	f.source = nil
+	f.subject = ""
+	return f.ReplayDomain()
 }
